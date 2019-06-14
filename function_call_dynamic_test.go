@@ -1,4 +1,4 @@
-package reflect_examples
+package reflectexamples
 
 import (
 	"fmt"
@@ -57,7 +57,7 @@ func eval(s string, funcs template.FuncMap) (string, error) {
 	}
 	result := v.Call(argv)
 	// in real-world code, we validate it before executing the function,
-	// using the v.NumOut() method. similiar to the text/template package.
+	// using the v.NumOut() method. similar to the text/template package.
 	if len(result) != 1 || result[0].Kind() != reflect.String {
 		return "", fmt.Errorf("function %s must return a one string value", name)
 	}

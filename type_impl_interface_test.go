@@ -1,4 +1,4 @@
-package reflect_examples
+package reflectexamples
 
 import (
 	"fmt"
@@ -26,10 +26,10 @@ func TestTypeImplInterface(x *testing.T) {
 	fmt.Println(encode(&TestTypeImplInterfaceUser{Github: "posener", Name: "Eyal", Email: "boring"}))
 }
 
-var marshalerType = reflect.TypeOf(new(TestTypeImplInterfaceMarshaler)).Elem()
-
 func encode(i interface{}) (string, error) {
 	t := reflect.TypeOf(i)
+
+	marshalerType := reflect.TypeOf(new(TestTypeImplInterfaceMarshaler)).Elem()
 	if !t.Implements(marshalerType) {
 		return "", fmt.Errorf("encode only supports structs that implement the Marshaler interface")
 	}
