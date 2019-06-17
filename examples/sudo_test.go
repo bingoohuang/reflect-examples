@@ -1,11 +1,11 @@
-package reflectexamples
+package examples
 
 import (
 	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/zeebo/sudo"
+	"github.com/bingoohuang/goreflect/sudo"
 )
 
 func TestSudo(t *testing.T) {

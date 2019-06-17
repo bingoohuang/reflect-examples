@@ -1,4 +1,4 @@
-module github.com/bingoohuang/reflectexamples
+module github.com/bingoohuang/goreflect
 
 go 1.12
 
