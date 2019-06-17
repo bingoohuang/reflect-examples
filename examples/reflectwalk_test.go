@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mitchellh/reflectwalk"
+	"github.com/bingoohuang/goreflect/walk"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,7 +31,7 @@ func TestReflectWalk(t *testing.T) {
 
 	walkMe := WalkMe{Name: "bingoo"}
 
-	err := reflectwalk.Walk(walkMe, &walker)
+	err := walk.Walk(walkMe, &walker)
 	assert.Nil(t, err)
 
 	assert.Equal(t, "Name:bingoo,", walker.FieldNameValues)
