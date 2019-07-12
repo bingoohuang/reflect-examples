@@ -40,3 +40,9 @@ The awesome gopher in the logo was taken from [@egonelbre/gophers](https://githu
 - [remove read-only restrictions](examples/sudo_test.go)
 - [reflect2 set](examples/set_test.go)
 
+
+### Resources
+
+1. [Golang reflector](https://github.com/tkrajina/go-reflector)
+1. [Copier for golang, copy value from struct to struct and more](https://github.com/jinzhu/copier)
+1. [DeepCopy makes deep copies of things: unexported field values are not copied](https://github.com/mohae/deepcopy)

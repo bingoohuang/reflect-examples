@@ -5,8 +5,9 @@ import (
 	"unsafe"
 )
 
-var offset uintptr
+var offset uintptr // nolint
 
+// nolint
 func init() {
 	field, ok := reflect.ValueOf(reflect.Value{}).Type().FieldByName("flag")
 	if !ok {
@@ -22,7 +23,7 @@ func Sudo(v reflect.Value) reflect.Value {
 
 	ptr := unsafe.Pointer(&v)
 	fptr := (*uintptr)(unsafe.Pointer(uintptr(ptr) + offset))
-	*fptr = *fptr &^ flagRO
+	*fptr &^= flagRO
 
 	return v
 }

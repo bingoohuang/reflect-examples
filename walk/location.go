@@ -15,5 +15,5 @@ const (
 	ArrayElem
 	Struct
 	StructField
-	WalkLoc
+	Loc
 )

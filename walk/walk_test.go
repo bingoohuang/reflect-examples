@@ -63,7 +63,7 @@ type TestPrimitiveCountWalker struct {
 }
 
 func (t *TestPrimitiveCountWalker) Primitive(v reflect.Value) error {
-	t.Count += 1
+	t.Count++
 	return nil
 }
 
@@ -126,21 +126,6 @@ func (t *TestSliceWalker) SliceElem(int, reflect.Value) error {
 	return nil
 }
 
-type TestArrayWalker struct {
-	Count    int
-	ArrayVal reflect.Value
-}
-
-func (t *TestArrayWalker) Array(v reflect.Value) error {
-	t.ArrayVal = v
-	return nil
-}
-
-func (t *TestArrayWalker) ArrayElem(int, reflect.Value) error {
-	t.Count++
-	return nil
-}
-
 type TestStructWalker struct {
 	Fields []string
 }
@@ -159,8 +144,7 @@ func (t *TestStructWalker) StructField(sf reflect.StructField, v reflect.Value) 
 }
 
 func TestTestStructs(t *testing.T) {
-	var raw interface{}
-	raw = new(TestEnterExitWalker)
+	var raw interface{} = new(TestEnterExitWalker)
 	if _, ok := raw.(EnterExitWalker); !ok {
 		t.Fatal("EnterExitWalker is bad")
 	}
@@ -178,11 +162,6 @@ func TestTestStructs(t *testing.T) {
 	raw = new(TestSliceWalker)
 	if _, ok := raw.(SliceWalker); !ok {
 		t.Fatal("SliceWalker is bad")
-	}
-
-	raw = new(TestArrayWalker)
-	if _, ok := raw.(ArrayWalker); !ok {
-		t.Fatal("ArrayWalker is bad")
 	}
 
 	raw = new(TestStructWalker)
@@ -276,7 +255,7 @@ func TestWalk_EnterExit(t *testing.T) {
 	}
 
 	expected := []Location{
-		WalkLoc,
+		Loc,
 		Struct,
 		StructField,
 		StructField,
@@ -289,7 +268,7 @@ func TestWalk_EnterExit(t *testing.T) {
 		Map,
 		StructField,
 		Struct,
-		WalkLoc,
+		Loc,
 	}
 	if !reflect.DeepEqual(w.Locs, expected) {
 		t.Fatalf("Bad: %#v", w.Locs)
@@ -538,61 +517,6 @@ func TestWalk_SliceWithPtr(t *testing.T) {
 	}
 }
 
-func TestWalk_Array(t *testing.T) {
-	w := new(TestArrayWalker)
-
-	type S struct {
-		Foo [3]string
-	}
-
-	data := &S{
-		Foo: [3]string{"a", "b", "c"},
-	}
-
-	err := Walk(data, w)
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
-
-	if !reflect.DeepEqual(w.ArrayVal.Interface(), data.Foo) {
-		t.Fatalf("bad: %#v", w.ArrayVal.Interface())
-	}
-
-	if w.Count != 3 {
-		t.Fatalf("Bad count: %d", w.Count)
-	}
-}
-
-func TestWalk_ArrayWithPtr(t *testing.T) {
-	w := new(TestArrayWalker)
-
-	// based on similar slice test
-	type I interface{}
-
-	type S struct {
-		Foo [1]I
-	}
-
-	type Empty struct{}
-
-	data := &S{
-		Foo: [1]I{&Empty{}},
-	}
-
-	err := Walk(data, w)
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
-
-	if !reflect.DeepEqual(w.ArrayVal.Interface(), data.Foo) {
-		t.Fatalf("bad: %#v", w.ArrayVal.Interface())
-	}
-
-	if w.Count != 1 {
-		t.Fatalf("Bad count: %d", w.Count)
-	}
-}
-
 type testErr struct{}
 
 func (t *testErr) Error() string {
@@ -721,12 +645,12 @@ func TestWalk_MapWithPointers(t *testing.T) {
 	}
 }
 
-type TestStructWalker_fieldSkip struct {
+type TestStructWalkerFieldSkip struct {
 	Skip   bool
 	Fields int
 }
 
-func (t *TestStructWalker_fieldSkip) Enter(l Location) error {
+func (t *TestStructWalkerFieldSkip) Enter(l Location) error {
 	if l == StructField {
 		t.Fields++
 	}
@@ -734,15 +658,15 @@ func (t *TestStructWalker_fieldSkip) Enter(l Location) error {
 	return nil
 }
 
-func (t *TestStructWalker_fieldSkip) Exit(Location) error {
+func (t *TestStructWalkerFieldSkip) Exit(Location) error {
 	return nil
 }
 
-func (t *TestStructWalker_fieldSkip) Struct(v reflect.Value) error {
+func (t *TestStructWalkerFieldSkip) Struct(v reflect.Value) error {
 	return nil
 }
 
-func (t *TestStructWalker_fieldSkip) StructField(sf reflect.StructField, v reflect.Value) error {
+func (t *TestStructWalkerFieldSkip) StructField(sf reflect.StructField, v reflect.Value) error {
 	if t.Skip && sf.Name[0] == '_' {
 		return SkipEntry
 	}
@@ -750,7 +674,7 @@ func (t *TestStructWalker_fieldSkip) StructField(sf reflect.StructField, v refle
 	return nil
 }
 
-func TestWalk_StructWithSkipEntry(t *testing.T) {
+func TestWalkStructWithSkipEntry(t *testing.T) {
 	data := &struct {
 		Foo, _Bar int
 	}{
@@ -759,7 +683,7 @@ func TestWalk_StructWithSkipEntry(t *testing.T) {
 	}
 
 	{
-		var s TestStructWalker_fieldSkip
+		var s TestStructWalkerFieldSkip
 		if err := Walk(data, &s); err != nil {
 			t.Fatalf("err: %s", err)
 		}
@@ -770,7 +694,7 @@ func TestWalk_StructWithSkipEntry(t *testing.T) {
 	}
 
 	{
-		var s TestStructWalker_fieldSkip
+		var s TestStructWalkerFieldSkip
 		s.Skip = true
 		if err := Walk(data, &s); err != nil {
 			t.Fatalf("err: %s", err)
@@ -782,12 +706,12 @@ func TestWalk_StructWithSkipEntry(t *testing.T) {
 	}
 }
 
-type TestStructWalker_valueSkip struct {
+type TestStructWalkerValueSkip struct {
 	Skip   bool
 	Fields int
 }
 
-func (t *TestStructWalker_valueSkip) Enter(l Location) error {
+func (t *TestStructWalkerValueSkip) Enter(l Location) error {
 	if l == StructField {
 		t.Fields++
 	}
@@ -795,11 +719,11 @@ func (t *TestStructWalker_valueSkip) Enter(l Location) error {
 	return nil
 }
 
-func (t *TestStructWalker_valueSkip) Exit(Location) error {
+func (t *TestStructWalkerValueSkip) Exit(Location) error {
 	return nil
 }
 
-func (t *TestStructWalker_valueSkip) Struct(v reflect.Value) error {
+func (t *TestStructWalkerValueSkip) Struct(v reflect.Value) error {
 	if t.Skip {
 		return SkipEntry
 	}
@@ -807,7 +731,7 @@ func (t *TestStructWalker_valueSkip) Struct(v reflect.Value) error {
 	return nil
 }
 
-func (t *TestStructWalker_valueSkip) StructField(sf reflect.StructField, v reflect.Value) error {
+func (t *TestStructWalkerValueSkip) StructField(sf reflect.StructField, v reflect.Value) error {
 	return nil
 }
 
@@ -820,7 +744,7 @@ func TestWalk_StructParentWithSkipEntry(t *testing.T) {
 	}
 
 	{
-		var s TestStructWalker_valueSkip
+		var s TestStructWalkerValueSkip
 		if err := Walk(data, &s); err != nil {
 			t.Fatalf("err: %s", err)
 		}
@@ -831,7 +755,7 @@ func TestWalk_StructParentWithSkipEntry(t *testing.T) {
 	}
 
 	{
-		var s TestStructWalker_valueSkip
+		var s TestStructWalkerValueSkip
 		s.Skip = true
 		if err := Walk(data, &s); err != nil {
 			t.Fatalf("err: %s", err)
