@@ -39,7 +39,30 @@ The awesome gopher in the logo was taken from [@egonelbre/gophers](https://githu
 - [reflect walk](examples/reflectwalk_test.go)
 - [remove read-only restrictions](examples/sudo_test.go)
 - [reflect2 set](examples/set_test.go)
+- [editing struct's fields during runtime and mapping structs to other structs](https://github.com/Ompluscator/dynamic-struct)
 
+    ```go
+    instance := dynamicstruct.NewStruct().
+		AddField("Integer", 0, `json:"int"`).
+		AddField("Text", "", `json:"someText"`).
+		AddField("Float", 0.0, `json:"double"`).
+		AddField("Boolean", false, "").
+		AddField("Slice", []int{}, "").
+		AddField("Anonymous", "", `json:"-"`).
+		Build().
+		New()
+
+	data := []byte(`
+    {
+        "int": 123,
+        "someText": "example",
+        "double": 123.45,
+        "Boolean": true,
+        "Slice": [1, 2, 3],
+        "Anonymous": "avoid to read"
+    }
+    `)
+    ```
 
 ### Resources
 
