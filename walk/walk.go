@@ -5,8 +5,8 @@
 package walk
 
 import (
-	"errors"
-	"reflect"
+    "errors"
+    "reflect"
 )
 
 // PrimitiveWalker implementations are able to handle primitive values
@@ -16,50 +16,50 @@ import (
 // These primitive values are often members of more complex
 // structures (slices, maps, etc.) that are walkable by other interfaces.
 type PrimitiveWalker interface {
-	Primitive(reflect.Value) error
+    Primitive(reflect.Value) error
 }
 
 // InterfaceWalker implementations are able to handle interface values as they
 // are encountered during the walk.
 type InterfaceWalker interface {
-	Interface(reflect.Value) error
+    Interface(reflect.Value) error
 }
 
 // MapWalker implementations are able to handle individual elements
 // found within a map structure.
 type MapWalker interface {
-	Map(m reflect.Value) error
-	MapElem(m, k, v reflect.Value) error
+    Map(m reflect.Value) error
+    MapElem(m, k, v reflect.Value) error
 }
 
 // SliceWalker implementations are able to handle slice elements found
 // within complex structures.
 type SliceWalker interface {
-	Slice(reflect.Value) error
-	SliceElem(int, reflect.Value) error
+    Slice(reflect.Value) error
+    SliceElem(int, reflect.Value) error
 }
 
 // StructWalker is an interface that has methods that are called for
 // structs when a Walk is done.
 type StructWalker interface {
-	Struct(reflect.Value) error
-	StructField(reflect.StructField, reflect.Value) error
+    Struct(reflect.Value) error
+    StructField(reflect.StructField, reflect.Value) error
 }
 
 // EnterExitWalker implementations are notified before and after
 // they walk deeper into complex structures (into struct fields,
 // into slice elements, etc.)
 type EnterExitWalker interface {
-	Enter(Location) error
-	Exit(Location) error
+    Enter(Location) error
+    Exit(Location) error
 }
 
 // PointerWalker implementations are notified when the value they're
 // walking is a pointer or not. Pointer is called for _every_ value whether
 // it is a pointer or not.
 type PointerWalker interface {
-	PointerEnter(bool) error
-	PointerExit(bool) error
+    PointerEnter(bool) error
+    PointerExit(bool) error
 }
 
 // SkipEntry can be returned from walk functions to skip walking
@@ -75,299 +75,299 @@ var SkipEntry = errors.New("skip this entry") // nolint
 // The interface should implement one or more of the walker interfaces
 // in this package, such as PrimitiveWalker, StructWalker, etc.
 func Walk(data, walker interface{}) (err error) {
-	v := reflect.ValueOf(data)
-	ew, ok := walker.(EnterExitWalker)
-	if ok {
-		err = ew.Enter(Loc)
-	}
+    v := reflect.ValueOf(data)
+    ew, ok := walker.(EnterExitWalker)
+    if ok {
+        err = ew.Enter(Loc)
+    }
 
-	if err == nil {
-		err = walk(v, walker)
-	}
+    if err == nil {
+        err = walk(v, walker)
+    }
 
-	if ok && err == nil {
-		err = ew.Exit(Loc)
-	}
+    if ok && err == nil {
+        err = ew.Exit(Loc)
+    }
 
-	return
+    return
 }
 
 func walk(v reflect.Value, w interface{}) (err error) {
-	// Determine if we're receiving a pointer and if so notify the walker.
-	// The logic here is convoluted but very important (tests will fail if
-	// almost any part is changed). I will try to explain here.
-	//
-	// First, we check if the value is an interface, if so, we really need
-	// to check the interface's VALUE to see whether it is a pointer.
-	//
-	// Check whether the value is then a pointer. If so, then set pointer
-	// to true to notify the user.
-	//
-	// If we still have a pointer or an interface after the indirections, then
-	// we unwrap another level
-	//
-	// At this time, we also set "v" to be the dereferenced value. This is
-	// because once we've unwrapped the pointer we want to use that value.
-	pointer := false
-	pointerV := v
+    // Determine if we're receiving a pointer and if so notify the walker.
+    // The logic here is convoluted but very important (tests will fail if
+    // almost any part is changed). I will try to explain here.
+    //
+    // First, we check if the value is an interface, if so, we really need
+    // to check the interface's VALUE to see whether it is a pointer.
+    //
+    // Check whether the value is then a pointer. If so, then set pointer
+    // to true to notify the user.
+    //
+    // If we still have a pointer or an interface after the indirections, then
+    // we unwrap another level
+    //
+    // At this time, we also set "v" to be the dereferenced value. This is
+    // because once we've unwrapped the pointer we want to use that value.
+    pointer := false
+    pointerV := v
 
-	for {
-		if pointerV.Kind() == reflect.Interface {
-			if iw, ok := w.(InterfaceWalker); ok {
-				if err = iw.Interface(pointerV); err != nil {
-					return
-				}
-			}
+    for {
+        if pointerV.Kind() == reflect.Interface {
+            if iw, ok := w.(InterfaceWalker); ok {
+                if err = iw.Interface(pointerV); err != nil {
+                    return
+                }
+            }
 
-			pointerV = pointerV.Elem()
-		}
+            pointerV = pointerV.Elem()
+        }
 
-		if pointerV.Kind() == reflect.Ptr {
-			pointer = true
-			v = reflect.Indirect(pointerV)
-		}
-		if pw, ok := w.(PointerWalker); ok {
-			if err = pw.PointerEnter(pointer); err != nil {
-				return
-			}
+        if pointerV.Kind() == reflect.Ptr {
+            pointer = true
+            v = reflect.Indirect(pointerV)
+        }
+        if pw, ok := w.(PointerWalker); ok {
+            if err = pw.PointerEnter(pointer); err != nil {
+                return
+            }
 
-			defer func(pointer bool) {
-				if err != nil {
-					return
-				}
+            defer func(pointer bool) {
+                if err != nil {
+                    return
+                }
 
-				err = pw.PointerExit(pointer)
-			}(pointer)
-		}
+                err = pw.PointerExit(pointer)
+            }(pointer)
+        }
 
-		if pointer {
-			pointerV = v
-		}
-		pointer = false
+        if pointer {
+            pointerV = v
+        }
+        pointer = false
 
-		// If we still have a pointer or interface we have to indirect another level.
-		switch pointerV.Kind() {
-		case reflect.Ptr, reflect.Interface:
-			continue
-		}
-		break
-	}
+        // If we still have a pointer or interface we have to indirect another level.
+        switch pointerV.Kind() {
+        case reflect.Ptr, reflect.Interface:
+            continue
+        }
+        break
+    }
 
-	// We preserve the original value here because if it is an interface
-	// type, we want to pass that directly into the walkPrimitive, so that
-	// we can set it.
-	originalV := v
-	if v.Kind() == reflect.Interface {
-		v = v.Elem()
-	}
+    // We preserve the original value here because if it is an interface
+    // type, we want to pass that directly into the walkPrimitive, so that
+    // we can set it.
+    originalV := v
+    if v.Kind() == reflect.Interface {
+        v = v.Elem()
+    }
 
-	k := v.Kind()
-	if k >= reflect.Int && k <= reflect.Complex128 {
-		k = reflect.Int
-	}
+    k := v.Kind()
+    if k >= reflect.Int && k <= reflect.Complex128 {
+        k = reflect.Int
+    }
 
-	switch k {
-	// Primitives
-	case reflect.Bool, reflect.Chan, reflect.Func, reflect.Int, reflect.String, reflect.Invalid:
-		return walkPrimitive(originalV, w)
-	case reflect.Map:
-		return walkMap(v, w)
-	case reflect.Slice, reflect.Array:
-		return walkSlice(v, w)
-	case reflect.Struct:
-		return walkStruct(v, w)
-	default:
-		panic("unsupported type: " + k.String())
-	}
+    switch k {
+    // Primitives
+    case reflect.Bool, reflect.Chan, reflect.Func, reflect.Int, reflect.String, reflect.Invalid:
+        return walkPrimitive(originalV, w)
+    case reflect.Map:
+        return walkMap(v, w)
+    case reflect.Slice, reflect.Array:
+        return walkSlice(v, w)
+    case reflect.Struct:
+        return walkStruct(v, w)
+    default:
+        panic("unsupported type: " + k.String())
+    }
 }
 
 func walkMap(v reflect.Value, w interface{}) error {
-	ew, ewok := w.(EnterExitWalker)
-	if ewok {
-		if err := ew.Enter(Map); err != nil {
-			return err
-		}
-	}
+    ew, ewok := w.(EnterExitWalker)
+    if ewok {
+        if err := ew.Enter(Map); err != nil {
+            return err
+        }
+    }
 
-	if mw, ok := w.(MapWalker); ok {
-		if err := mw.Map(v); err != nil {
-			return err
-		}
-	}
+    if mw, ok := w.(MapWalker); ok {
+        if err := mw.Map(v); err != nil {
+            return err
+        }
+    }
 
-	for _, k := range v.MapKeys() {
-		kv := v.MapIndex(k)
+    for _, k := range v.MapKeys() {
+        kv := v.MapIndex(k)
 
-		if mw, ok := w.(MapWalker); ok {
-			if err := mw.MapElem(v, k, kv); err != nil {
-				return err
-			}
-		}
+        if mw, ok := w.(MapWalker); ok {
+            if err := mw.MapElem(v, k, kv); err != nil {
+                return err
+            }
+        }
 
-		ew, ok := w.(EnterExitWalker)
-		if ok {
-			if err := ew.Enter(MapKey); err != nil {
-				return err
-			}
-		}
+        ew, ok := w.(EnterExitWalker)
+        if ok {
+            if err := ew.Enter(MapKey); err != nil {
+                return err
+            }
+        }
 
-		if err := walk(k, w); err != nil {
-			return err
-		}
+        if err := walk(k, w); err != nil {
+            return err
+        }
 
-		if ok {
-			if err := ew.Exit(MapKey); err != nil {
-				return err
-			}
-			if err := ew.Enter(MapValue); err != nil {
-				return err
-			}
-		}
+        if ok {
+            if err := ew.Exit(MapKey); err != nil {
+                return err
+            }
+            if err := ew.Enter(MapValue); err != nil {
+                return err
+            }
+        }
 
-		// get the map value again as it may have changed in the MapElem call
-		if err := walk(v.MapIndex(k), w); err != nil {
-			return err
-		}
+        // get the map value again as it may have changed in the MapElem call
+        if err := walk(v.MapIndex(k), w); err != nil {
+            return err
+        }
 
-		if ok {
-			if err := ew.Exit(MapValue); err != nil {
-				return err
-			}
-		}
-	}
+        if ok {
+            if err := ew.Exit(MapValue); err != nil {
+                return err
+            }
+        }
+    }
 
-	if ewok {
-		if err := ew.Exit(Map); err != nil {
-			return err
-		}
-	}
+    if ewok {
+        if err := ew.Exit(Map); err != nil {
+            return err
+        }
+    }
 
-	return nil
+    return nil
 }
 
 func walkPrimitive(v reflect.Value, w interface{}) error {
-	if pw, ok := w.(PrimitiveWalker); ok {
-		return pw.Primitive(v)
-	}
+    if pw, ok := w.(PrimitiveWalker); ok {
+        return pw.Primitive(v)
+    }
 
-	return nil
+    return nil
 }
 
 func walkSlice(v reflect.Value, w interface{}) (err error) {
-	ew, ok := w.(EnterExitWalker)
-	if ok {
-		if err := ew.Enter(Slice); err != nil {
-			return err
-		}
-	}
+    ew, ok := w.(EnterExitWalker)
+    if ok {
+        if err := ew.Enter(Slice); err != nil {
+            return err
+        }
+    }
 
-	if sw, ok := w.(SliceWalker); ok {
-		if err := sw.Slice(v); err != nil {
-			return err
-		}
-	}
+    if sw, ok := w.(SliceWalker); ok {
+        if err := sw.Slice(v); err != nil {
+            return err
+        }
+    }
 
-	for i := 0; i < v.Len(); i++ {
-		elem := v.Index(i)
+    for i := 0; i < v.Len(); i++ {
+        elem := v.Index(i)
 
-		if sw, ok := w.(SliceWalker); ok {
-			if err := sw.SliceElem(i, elem); err != nil {
-				return err
-			}
-		}
+        if sw, ok := w.(SliceWalker); ok {
+            if err := sw.SliceElem(i, elem); err != nil {
+                return err
+            }
+        }
 
-		ew, ok := w.(EnterExitWalker)
-		if ok {
-			if err := ew.Enter(SliceElem); err != nil {
-				return err
-			}
-		}
+        ew, ok := w.(EnterExitWalker)
+        if ok {
+            if err := ew.Enter(SliceElem); err != nil {
+                return err
+            }
+        }
 
-		if err := walk(elem, w); err != nil {
-			return err
-		}
+        if err := walk(elem, w); err != nil {
+            return err
+        }
 
-		if ok {
-			if err := ew.Exit(SliceElem); err != nil {
-				return err
-			}
-		}
-	}
+        if ok {
+            if err := ew.Exit(SliceElem); err != nil {
+                return err
+            }
+        }
+    }
 
-	ew, ok = w.(EnterExitWalker)
-	if ok {
-		if err := ew.Exit(Slice); err != nil {
-			return err
-		}
-	}
+    ew, ok = w.(EnterExitWalker)
+    if ok {
+        if err := ew.Exit(Slice); err != nil {
+            return err
+        }
+    }
 
-	return nil
+    return nil
 }
 
 func walkStruct(v reflect.Value, w interface{}) (err error) {
-	ew, ewok := w.(EnterExitWalker)
-	if ewok {
-		if err := ew.Enter(Struct); err != nil {
-			return err
-		}
-	}
+    ew, ewok := w.(EnterExitWalker)
+    if ewok {
+        if err := ew.Enter(Struct); err != nil {
+            return err
+        }
+    }
 
-	skip := false
-	if sw, ok := w.(StructWalker); ok {
-		err = sw.Struct(v)
-		if err == SkipEntry {
-			skip = true
-			err = nil
-		}
-		if err != nil {
-			return
-		}
-	}
+    skip := false
+    if sw, ok := w.(StructWalker); ok {
+        err = sw.Struct(v)
+        if err == SkipEntry {
+            skip = true
+            err = nil
+        }
+        if err != nil {
+            return
+        }
+    }
 
-	if !skip {
-		vt := v.Type()
-		for i := 0; i < vt.NumField(); i++ {
-			sf := vt.Field(i)
-			f := v.FieldByIndex([]int{i})
+    if !skip {
+        vt := v.Type()
+        for i := 0; i < vt.NumField(); i++ {
+            sf := vt.Field(i)
+            f := v.FieldByIndex([]int{i})
 
-			if sw, ok := w.(StructWalker); ok {
-				err = sw.StructField(sf, f)
+            if sw, ok := w.(StructWalker); ok {
+                err = sw.StructField(sf, f)
 
-				// SkipEntry just pretends this field doesn't even exist
-				if err == SkipEntry {
-					continue
-				}
+                // SkipEntry just pretends this field doesn't even exist
+                if err == SkipEntry {
+                    continue
+                }
 
-				if err != nil {
-					return
-				}
-			}
+                if err != nil {
+                    return
+                }
+            }
 
-			ew, ok := w.(EnterExitWalker)
-			if ok {
-				if err := ew.Enter(StructField); err != nil {
-					return err
-				}
-			}
+            ew, ok := w.(EnterExitWalker)
+            if ok {
+                if err := ew.Enter(StructField); err != nil {
+                    return err
+                }
+            }
 
-			err = walk(f, w)
-			if err != nil {
-				return
-			}
+            err = walk(f, w)
+            if err != nil {
+                return
+            }
 
-			if ok {
-				if err := ew.Exit(StructField); err != nil {
-					return err
-				}
-			}
-		}
-	}
+            if ok {
+                if err := ew.Exit(StructField); err != nil {
+                    return err
+                }
+            }
+        }
+    }
 
-	if ewok {
-		if err := ew.Exit(Struct); err != nil {
-			return err
-		}
-	}
+    if ewok {
+        if err := ew.Exit(Struct); err != nil {
+            return err
+        }
+    }
 
-	return nil
+    return nil
 }
