@@ -5,15 +5,15 @@ package walk
 type Location uint
 
 const (
-	None Location = iota
-	Map
-	MapKey
-	MapValue
-	Slice
-	SliceElem
-	Array
-	ArrayElem
-	Struct
-	StructField
-	Loc
+    None Location = iota
+    Map
+    MapKey
+    MapValue
+    Slice
+    SliceElem
+    Array
+    ArrayElem
+    Struct
+    StructField
+    Loc
 )

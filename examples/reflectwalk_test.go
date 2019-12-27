@@ -1,38 +1,38 @@
 package examples
 
 import (
-	"reflect"
-	"testing"
+    "reflect"
+    "testing"
 
-	"github.com/bingoohuang/goreflect/walk"
-	"github.com/stretchr/testify/assert"
+    "github.com/bingoohuang/goreflect/walk"
+    "github.com/stretchr/testify/assert"
 )
 
 type WalkMe struct {
-	Name string
+    Name string
 }
 
 type Walker struct {
-	FieldNameValues string
+    FieldNameValues string
 }
 
 func (Walker) Struct(reflect.Value) error {
-	return nil
+    return nil
 }
 
 func (w *Walker) StructField(f reflect.StructField, v reflect.Value) error {
-	w.FieldNameValues += f.Name + ":" + v.String() + ","
+    w.FieldNameValues += f.Name + ":" + v.String() + ","
 
-	return nil
+    return nil
 }
 
 func TestReflectWalk(t *testing.T) {
-	var walker Walker
+    var walker Walker
 
-	walkMe := WalkMe{Name: "bingoo"}
+    walkMe := WalkMe{Name: "bingoo"}
 
-	err := walk.Walk(walkMe, &walker)
-	assert.Nil(t, err)
+    err := walk.Walk(walkMe, &walker)
+    assert.Nil(t, err)
 
-	assert.Equal(t, "Name:bingoo,", walker.FieldNameValues)
+    assert.Equal(t, "Name:bingoo,", walker.FieldNameValues)
 }
