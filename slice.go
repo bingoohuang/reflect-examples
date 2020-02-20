@@ -1,3 +1,5 @@
+// Package goreflect ...
+// nolint gomnd
 package goreflect
 
 import (
@@ -46,6 +48,7 @@ func GetSliceByPtr(v interface{}) (reflect.Value, error) {
 	return ve, nil
 }
 
+// SliceContains tells if a slice contains a element.
 func SliceContains(slice interface{}, elem interface{}) bool {
 	arrValue := reflect.ValueOf(slice)
 	arrType := arrValue.Type()
@@ -71,6 +74,7 @@ func RandomIntN(n uint64) int {
 	return int(i)
 }
 
+// IterateSlice iterates a slice with a function fn.
 func IterateSlice(arr interface{}, start int, fn interface{}) (bool, interface{}) {
 	if !funk.IsFunction(fn) {
 		panic("Second argument must be function")

@@ -15,6 +15,7 @@ func MapKeys(m interface{}) []string {
 func MapKeysSorted(m interface{}) []string {
 	keys := MapKeys(m)
 	sort.Strings(keys)
+
 	return keys
 }
 
@@ -27,6 +28,7 @@ func MapKeysX(m interface{}) interface{} {
 
 	keyType := v.Type().Key()
 	ks := reflect.MakeSlice(reflect.SliceOf(keyType), v.Len(), v.Len())
+
 	for i, key := range v.MapKeys() {
 		ks.Index(i).Set(key)
 	}
@@ -44,17 +46,18 @@ func MapKeysSortedX(m interface{}) interface{} {
 	mapLen := mv.Len()
 	keyType := mv.Type().Key()
 	keyKind := keyType.Kind()
+
 	var keyMap map[interface{}]string
+
 	switch keyKind {
-	case reflect.String:
-	case reflect.Int:
-	case reflect.Float64:
+	case reflect.String, reflect.Int, reflect.Float64:
 	default:
 		keyMap = make(map[interface{}]string, mapLen)
 	}
 
 	ks := reflect.MakeSlice(reflect.SliceOf(keyType), mapLen, mapLen)
 	i := 0
+
 	for _, k := range mv.MapKeys() {
 		if keyMap != nil {
 			keyMap[k.Interface()] = fmt.Sprintf("%v", k.Interface())
@@ -100,6 +103,7 @@ func MapValuesX(m interface{}) interface{} {
 
 	typ := v.Type().Elem()
 	sl := reflect.MakeSlice(reflect.SliceOf(typ), v.Len(), v.Len())
+
 	for i, key := range v.MapKeys() {
 		sl.Index(i).Set(v.MapIndex(key))
 	}
@@ -132,16 +136,17 @@ func WalkMap(m interface{}, iterFunc interface{}) {
 	mapLen := mv.Len()
 	keyType := mv.Type().Key()
 	keyKind := keyType.Kind()
+
 	var keyMap map[interface{}]string
+
 	switch keyKind {
-	case reflect.String:
-	case reflect.Int:
-	case reflect.Float64:
+	case reflect.String, reflect.Int, reflect.Float64:
 	default:
 		keyMap = make(map[interface{}]string, mapLen)
 	}
 
 	ks := reflect.MakeSlice(reflect.SliceOf(keyType), mapLen, mapLen)
+
 	for i, k := range mv.MapKeys() {
 		if keyMap != nil {
 			keyMap[k.Interface()] = fmt.Sprintf("%v", k.Interface())

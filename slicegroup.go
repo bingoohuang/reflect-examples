@@ -29,11 +29,14 @@ func MakeSliceGroup(slice interface{}, byFn func(interface{}) interface{}) (*Sli
 // NextGroup 返回下一个分组的group和slice
 func (s *SliceGroup) NextGroup() (group interface{}, groupSlice interface{}, ok bool) {
 	started := false
+
 	for s.start = s.end; s.end < s.len; s.end++ {
 		gr := s.byFn(s.slice.Index(s.end).Interface())
+
 		if !started {
 			started = true
 			s.group = gr
+
 			continue
 		}
 

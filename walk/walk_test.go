@@ -1,3 +1,4 @@
+// nolint gomnd
 package walk
 
 import (
@@ -668,7 +669,7 @@ func (t *TestStructWalkerFieldSkip) Struct(v reflect.Value) error {
 
 func (t *TestStructWalkerFieldSkip) StructField(sf reflect.StructField, v reflect.Value) error {
 	if t.Skip && sf.Name[0] == '_' {
-		return SkipEntry
+		return ErrSkipEntry
 	}
 
 	return nil
@@ -725,7 +726,7 @@ func (t *TestStructWalkerValueSkip) Exit(Location) error {
 
 func (t *TestStructWalkerValueSkip) Struct(v reflect.Value) error {
 	if t.Skip {
-		return SkipEntry
+		return ErrSkipEntry
 	}
 
 	return nil

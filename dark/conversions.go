@@ -20,5 +20,6 @@ func ByteSlice(s string) []byte {
 		Len:  sh.Len,
 		Cap:  sh.Len,
 	}
+
 	return *(*[]byte)(unsafe.Pointer(&bh))
 }

@@ -9,6 +9,7 @@ func TestString(t *testing.T) {
 	b := []byte("foo")
 	s := String(b)
 	b[0], b[1], b[2] = 'b', 'a', 'r'
+
 	if s != "bar" {
 		t.Errorf("String conversion failed, expected %q, got \"bar\"", s)
 		return
@@ -20,6 +21,7 @@ func TestByteSlice(t *testing.T) {
 	s := String(b0)
 	b := ByteSlice(s)
 	b[0], b[1], b[2] = 'b', 'a', 'r'
+
 	if string(b) != "bar" {
 		t.Errorf("String conversion failed, expected %q, got \"bar\"", s)
 		return

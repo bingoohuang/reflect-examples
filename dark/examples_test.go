@@ -5,11 +5,11 @@ import (
 )
 
 // The cost of copying memory from RAM to CPU is quite high. This strategy here
-// guarantees that small enough data can be layed out continuously in memory.
+// guarantees that small enough data can be layyed out continuously in memory.
 // That way your data will be fetch in the minimal amount memory access. The
 // example only packs 2 slice but this can easilly be extended to more then 2
 // slice or even to other pointers to any structs or any combination of these.
-func ExampleMemoryPacking() {
+func ExampleMemoryPacking() { // nolint funlen
 	mem0, mem1 := []int{1, 2, 3}, []float64{4, 5, 6, 7}
 	sizeElem0 := unsafe.Sizeof(mem0[0]) // sizeof(int)
 	sizeElem1 := unsafe.Sizeof(mem1[0]) // sizeof(float64)
@@ -18,6 +18,7 @@ func ExampleMemoryPacking() {
 	// bailing guarantees that continuous blocks stay continuous.
 	byteAftermem0 := uintptr(unsafe.Pointer(&mem0[0])) + sizeElem0*uintptr(len(mem0))
 	beginingOfmem1 := uintptr(unsafe.Pointer(&mem1[0]))
+
 	if byteAftermem0 == beginingOfmem1 {
 		// return
 	}
