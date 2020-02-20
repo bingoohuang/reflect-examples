@@ -8,8 +8,6 @@ import (
 )
 
 const (
-	// tagName is the deepcopier struct tag name.
-	tagName = "copystruct"
 	// optionField is the from field option name for struct tag.
 	optionField = "field"
 	// optionContext is the context option name for struct tag.
@@ -22,50 +20,60 @@ const (
 	optionConvert = "convert"
 )
 
-// tagOptions is a map that contains extracted struct tag options.
+// tagOptions is a map that contains extracted struct tag context.
 type tagOptions map[string]string
 
-// options are copier options.
-type options struct {
-	// Context given to WithContext() method.
-	Context map[string]interface{}
-	// Reversed reverses struct tag checkings.
-	Reversed bool
+// OptionFn types the option func type.
+type OptionFn func(cs *CopyStruct)
+
+// CopyStruct deep copies a struct to/from a struct.
+type CopyStruct struct {
+	dst, src interface{}
+	ctx      map[string]interface{}
+	tagName  string
 }
 
-// DeepCopier deep copies a struct to/from a struct.
-type DeepCopier struct {
-	dst interface{}
-	src interface{}
-	ctx map[string]interface{}
+// TagName customizes the tagName (default is copystruct)
+func TagName(tagName string) OptionFn {
+	return func(cs *CopyStruct) {
+		cs.tagName = tagName
+	}
 }
 
 // Copy sets source or destination.
-func Copy(src interface{}) *DeepCopier { return &DeepCopier{src: src} }
+func Copy(src interface{}, optionFns ...OptionFn) *CopyStruct {
+	c := &CopyStruct{src: src, tagName: "copystruct"}
+
+	for _, fn := range optionFns {
+		fn(c)
+	}
+
+	return c
+}
 
 // WithContext injects the given context into the builder instance.
-func (dc *DeepCopier) WithContext(ctx map[string]interface{}) *DeepCopier {
+func (dc *CopyStruct) WithContext(ctx map[string]interface{}) *CopyStruct {
 	dc.ctx = ctx
 	return dc
 }
 
 // To sets the destination.
-func (dc *DeepCopier) To(dst interface{}) error {
+func (dc *CopyStruct) To(dst interface{}) error {
 	dc.dst = dst
 
-	return process(dc.dst, dc.src, options{Context: dc.ctx})
+	return dc.process(dc.dst, dc.src, false)
 }
 
 // From sets the given the source as destination and destination as source.
-func (dc *DeepCopier) From(src interface{}) error {
+func (dc *CopyStruct) From(src interface{}) error {
 	dc.dst = dc.src
 	dc.src = src
 
-	return process(dc.dst, dc.src, options{Context: dc.ctx, Reversed: true})
+	return dc.process(dc.dst, dc.src, true)
 }
 
 // process handles copy.
-func process(dst, src interface{}, options options) error {
+func (dc *CopyStruct) process(dst, src interface{}, reversed bool) error {
 	dstValue := reflect.Indirect(reflect.ValueOf(dst))
 	if !dstValue.CanAddr() {
 		return fmt.Errorf("destination %+v is unaddressable", dstValue.Interface())
@@ -74,11 +82,11 @@ func process(dst, src interface{}, options options) error {
 	srcValue := reflect.Indirect(reflect.ValueOf(src))
 
 	for _, f := range getFieldNames(src) {
-		copyFields(srcValue, dstValue, f, options, dst)
+		dc.copyFields(srcValue, dstValue, f, dst, reversed)
 	}
 
 	for _, m := range getMethodNames(src) {
-		if err := copyMethods(dstValue, src, dst, m, options); err != nil {
+		if err := dc.copyMethods(dstValue, src, dst, m); err != nil {
 			return err
 		}
 	}
@@ -86,8 +94,8 @@ func process(dst, src interface{}, options options) error {
 	return nil
 }
 
-func copyMethods(dstValue reflect.Value, src, dst interface{}, m string, opts options) error {
-	name, tagOptions := getRelatedField(dst, m)
+func (dc *CopyStruct) copyMethods(dstValue reflect.Value, src, dst interface{}, m string) error {
+	name, tagOptions := dc.getRelatedField(dst, m)
 	if name == "" {
 		return nil
 	}
@@ -109,7 +117,7 @@ func copyMethods(dstValue reflect.Value, src, dst interface{}, m string, opts op
 	args := make([]reflect.Value, 0)
 
 	if _, withContext := tagOptions[optionContext]; withContext {
-		args = []reflect.Value{reflect.ValueOf(opts.Context)}
+		args = []reflect.Value{reflect.ValueOf(dc.ctx)}
 	}
 
 	resultValue := method.Call(args)[0]
@@ -120,50 +128,41 @@ func copyMethods(dstValue reflect.Value, src, dst interface{}, m string, opts op
 		ptr := reflect.New(resultType)
 		ptr.Elem().Set(resultValue)
 
-		if ptr.Type().AssignableTo(dstFieldType.Type) {
-			dstFieldValue.Set(ptr)
-		}
+		setFieldValue(ptr.Type(), dstFieldType.Type, dstFieldValue, ptr, tagOptions)
 
 		return nil
 	}
 
 	// Ptr -> value
 	if resultValue.Kind() == reflect.Ptr && force {
-		if resultValue.Elem().Type().AssignableTo(dstFieldType.Type) {
-			dstFieldValue.Set(resultValue.Elem())
-		}
+		setFieldValue(resultValue.Elem().Type(), dstFieldType.Type, dstFieldValue, resultValue.Elem(), tagOptions)
 
 		return nil
 	}
 
 	if resultValue.IsValid() {
-		if resultType.AssignableTo(dstFieldType.Type) {
-			dstFieldValue.Set(resultValue)
-			return nil
-		}
-
-		if _, ok := tagOptions[optionConvert]; ok && resultType.ConvertibleTo(dstFieldType.Type) {
-			dstFieldValue.Set(resultValue.Convert(dstFieldType.Type))
-		}
+		setFieldValue(resultType, dstFieldType.Type, dstFieldValue, resultValue, tagOptions)
 	}
+
 	return nil
 }
 
-func copyFields(srcValue, dstValue reflect.Value, f string, opts options, dst interface{}) {
-	srcFieldType, srcFieldFound := srcValue.Type().FieldByName(f)
+func (dc *CopyStruct) copyFields(srcValue, dstValue reflect.Value, f string, dst interface{}, reversed bool) {
+	srcFieldStruct, srcFieldFound := srcValue.Type().FieldByName(f)
 	if !srcFieldFound {
 		return
 	}
 
 	srcFieldValue := srcValue.FieldByName(f)
-	srcFieldName := srcFieldType.Name
+	srcFieldType := srcFieldStruct.Type
+	srcFieldName := srcFieldStruct.Name
 
-	dstFieldName, tagOptions := parseDstFieldName(srcFieldName, opts, srcFieldType, dst)
+	dstFieldName, tagOptions := dc.parseDstFieldName(srcFieldName, reversed, srcFieldStruct, dst)
 	if _, ok := tagOptions[optionSkip]; ok {
 		return
 	}
 
-	dstFieldType, dstFieldFound := dstValue.Type().FieldByName(dstFieldName)
+	dstStructField, dstFieldFound := dstValue.Type().FieldByName(dstFieldName)
 	if !dstFieldFound {
 		return
 	}
@@ -174,11 +173,11 @@ func copyFields(srcValue, dstValue reflect.Value, f string, opts options, dst in
 	_, force := tagOptions[optionForce]
 
 	dstKind := dstFieldValue.Kind()
-	if isNullableType(srcFieldType.Type) {
+	if isNullableType(srcFieldType) {
 		if dstKind == reflect.Ptr && force { // Valuer -> ptr
-			processNullableTypeValuer2Ptr(srcFieldValue, dstFieldValue, dstFieldType)
+			processNullableTypeValuer2Ptr(srcFieldValue, dstFieldValue, dstStructField, tagOptions)
 		} else { // Valuer -> value
-			processNullableTypeValuer2Value(srcFieldValue, dstFieldValue, dstFieldType, force)
+			processNullableTypeValuer2Value(srcFieldValue, dstFieldValue, dstStructField, force, tagOptions)
 		}
 
 		return
@@ -193,35 +192,37 @@ func copyFields(srcValue, dstValue reflect.Value, f string, opts options, dst in
 	}
 
 	// Ptr -> Value
-	if srcFieldType.Type.Kind() == reflect.Ptr && !srcFieldValue.IsNil() && dstKind != reflect.Ptr {
-		indirect := reflect.Indirect(srcFieldValue)
-
-		if indirect.Type().AssignableTo(dstFieldType.Type) {
-			dstFieldValue.Set(indirect)
-
-			return
-		}
+	if srcFieldType.Kind() == reflect.Ptr && !srcFieldValue.IsNil() && dstKind != reflect.Ptr {
+		srcFieldValue = reflect.Indirect(srcFieldValue)
+		srcFieldType = srcFieldValue.Type()
 	}
 
-	// Other types
-	if srcFieldType.Type.AssignableTo(dstFieldType.Type) {
-		dstFieldValue.Set(srcFieldValue)
-		return
-	}
-
-	if _, ok := tagOptions[optionConvert]; ok && srcFieldType.Type.ConvertibleTo(dstFieldType.Type) {
-		dstFieldValue.Set(srcFieldValue.Convert(dstFieldType.Type))
-	}
+	setFieldValue(srcFieldType, dstStructField.Type, dstFieldValue, srcFieldValue, tagOptions)
 }
 
-func processNullableTypeValuer2Ptr(srcFieldValue, dstFieldValue reflect.Value, dstFieldType reflect.StructField) {
-	// We have same nullable type on both sides
-	if srcFieldValue.Type().AssignableTo(dstFieldType.Type) {
+func setFieldValue(srcFieldType reflect.Type, dstFieldType reflect.Type,
+	dstFieldValue, srcFieldValue reflect.Value, tagOptions tagOptions) bool {
+	if srcFieldType.AssignableTo(dstFieldType) {
 		dstFieldValue.Set(srcFieldValue)
+		return true
+	}
+
+	if _, ok := tagOptions[optionConvert]; ok && srcFieldType.ConvertibleTo(dstFieldType) {
+		dstFieldValue.Set(srcFieldValue.Convert(dstFieldType))
+		return true
+	}
+
+	return false
+}
+
+func processNullableTypeValuer2Ptr(srcFieldVal, dstFieldVal reflect.Value,
+	dstStructField reflect.StructField, tagOptions tagOptions) {
+	// We have same nullable type on both sides
+	if setFieldValue(srcFieldVal.Type(), dstStructField.Type, dstFieldVal, srcFieldVal, tagOptions) {
 		return
 	}
 
-	v, _ := srcFieldValue.Interface().(driver.Valuer).Value()
+	v, _ := srcFieldVal.Interface().(driver.Valuer).Value()
 	if v == nil {
 		return
 	}
@@ -231,16 +232,13 @@ func processNullableTypeValuer2Ptr(srcFieldValue, dstFieldValue reflect.Value, d
 	ptr := reflect.New(valueType)
 	ptr.Elem().Set(reflect.ValueOf(v))
 
-	if valueType.AssignableTo(dstFieldType.Type.Elem()) {
-		dstFieldValue.Set(ptr)
-	}
+	setFieldValue(valueType, dstStructField.Type.Elem(), dstFieldVal, ptr, tagOptions)
 }
 
 func processNullableTypeValuer2Value(srcFieldValue, dstFieldValue reflect.Value,
-	dstFieldType reflect.StructField, force bool) {
+	dstFieldType reflect.StructField, force bool, tagOptions tagOptions) {
 	// We have same nullable type on both sides
-	if srcFieldValue.Type().AssignableTo(dstFieldType.Type) {
-		dstFieldValue.Set(srcFieldValue)
+	if setFieldValue(srcFieldValue.Type(), dstFieldType.Type, dstFieldValue, srcFieldValue, tagOptions) {
 		return
 	}
 
@@ -254,17 +252,16 @@ func processNullableTypeValuer2Value(srcFieldValue, dstFieldValue reflect.Value,
 	}
 
 	rv := reflect.ValueOf(v)
-	if rv.Type().AssignableTo(dstFieldType.Type) {
-		dstFieldValue.Set(rv)
-	}
+
+	setFieldValue(rv.Type(), dstFieldType.Type, dstFieldValue, rv, tagOptions)
 }
 
-func parseDstFieldName(srcFieldName string, options options,
-	srcFieldType reflect.StructField, dst interface{}) (string, tagOptions) {
+func (dc *CopyStruct) parseDstFieldName(srcFieldName string, reversed bool,
+	srcStructField reflect.StructField, dst interface{}) (string, tagOptions) {
 	dstFieldName := srcFieldName
 
-	if options.Reversed {
-		tagOptions := parseTagOptions(srcFieldType.Tag.Get(tagName))
+	if reversed {
+		tagOptions := parseTagOptions(srcStructField.Tag.Get(dc.tagName))
 		if v, ok := tagOptions[optionField]; ok && v != "" {
 			dstFieldName = v
 		}
@@ -272,14 +269,14 @@ func parseDstFieldName(srcFieldName string, options options,
 		return dstFieldName, tagOptions
 	}
 
-	if name, opts := getRelatedField(dst, srcFieldName); name != "" {
+	if name, opts := dc.getRelatedField(dst, srcFieldName); name != "" {
 		return name, opts
 	}
 
 	return dstFieldName, tagOptions{}
 }
 
-// parseTagOptions parses deepcopier tag field and returns options.
+// parseTagOptions parses deepcopier tag field and returns context.
 // nolint gomnd
 func parseTagOptions(value string) tagOptions {
 	options := tagOptions{}
@@ -299,7 +296,7 @@ func parseTagOptions(value string) tagOptions {
 }
 
 // getRelatedField returns first matching field.
-func getRelatedField(instance interface{}, name string) (string, tagOptions) {
+func (dc *CopyStruct) getRelatedField(instance interface{}, name string) (string, tagOptions) {
 	value := reflect.Indirect(reflect.ValueOf(instance))
 	fieldName := ""
 	tagOptions := tagOptions{}
@@ -307,10 +304,10 @@ func getRelatedField(instance interface{}, name string) (string, tagOptions) {
 	for i := 0; i < value.NumField(); i++ {
 		vField := value.Field(i)
 		tField := value.Type().Field(i)
-		tagOptions := parseTagOptions(tField.Tag.Get(tagName))
+		tagOptions := parseTagOptions(tField.Tag.Get(dc.tagName))
 
 		if tField.Type.Kind() == reflect.Struct && tField.Anonymous {
-			if n, o := getRelatedField(vField.Interface(), name); n != "" {
+			if n, o := dc.getRelatedField(vField.Interface(), name); n != "" {
 				return n, o
 			}
 		}
