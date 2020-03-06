@@ -30,3 +30,14 @@ func IsEmptyValue(value reflect.Value) bool {
 
 	return reflect.DeepEqual(value.Interface(), reflect.Zero(value.Type()).Interface())
 }
+
+// IndirectAll returns the value that v points to.
+// If v is a nil pointer, Indirect returns a zero Value.
+// If v is not a pointer, Indirect returns v.
+func IndirectAll(v reflect.Value) reflect.Value {
+	for v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	return v
+}

@@ -11,7 +11,7 @@ func TestHeaders(t *testing.T) {
 		Dark, Reflect interface{}
 		name          string
 	}{
-		{StringHeader{}, reflect.StringHeader{}, "String"},
+		{StringHeader{}, reflect.StringHeader{}, "Stringer"},
 		{SliceHeader{}, reflect.SliceHeader{}, "Slice"},
 	}
 

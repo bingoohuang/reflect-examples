@@ -15,7 +15,7 @@ func TestParseTag_Name(t *testing.T) {
 	}
 
 	for _, tag := range tags {
-		name, _ := parseTag(tag.tag)
+		name, _ := parseTag(&Option{}, tag.tag)
 
 		if (name != "name") && tag.has {
 			t.Errorf("Parse tag should return name: %#v", tag)
@@ -37,7 +37,7 @@ func TestParseTag_Opts(t *testing.T) {
 
 	// search for "opt"
 	for _, tag := range tags {
-		_, opts := parseTag(tag.opts)
+		_, opts := parseTag(&Option{}, tag.opts)
 
 		if opts.Has("opt") != tag.has {
 			t.Errorf("Tag opts should have opt: %#v", tag)

@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMapNonStruct(t *testing.T) {
@@ -82,6 +84,8 @@ func TestMap(t *testing.T) {
 		}
 	}
 
+	as := MapString(T)
+	assert.Equal(t, map[string]string{"A": "a-value", "B": "2", "C": "true"}, as)
 }
 
 func TestMap_Tag(t *testing.T) {
@@ -129,8 +133,7 @@ func TestMap_CustomTag(t *testing.T) {
 	}
 	T.D.E = "e-value"
 
-	s := New(T)
-	s.TagName = "json"
+	s := New(T, TagName("json"))
 
 	a := s.Map()
 
@@ -170,15 +173,13 @@ func TestMap_MultipleCustomTag(t *testing.T) {
 		X string `aa:"ax"`
 	}{"a_value"}
 
-	aStruct := New(A)
-	aStruct.TagName = "aa"
+	aStruct := New(A, TagName("aa"))
 
 	var B = struct {
 		X string `bb:"bx"`
 	}{"b_value"}
 
-	bStruct := New(B)
-	bStruct.TagName = "bb"
+	bStruct := New(B, TagName("bb"))
 
 	a, b := aStruct.Map(), bStruct.Map()
 	if !reflect.DeepEqual(a, map[string]interface{}{"ax": "a_value"}) {
@@ -1341,9 +1342,7 @@ func TestTagWithStringOption(t *testing.T) {
 		}
 	}()
 
-	s := New(address)
-
-	s.TagName = "json"
+	s := New(address, TagName("json"))
 	m := s.Map()
 
 	if m["person"] != person.String() {
@@ -1361,18 +1360,20 @@ type Animal struct {
 	Age  int
 }
 
-type Dog struct {
-	Animal *Animal `json:"animal,string"`
-}
-
 func TestNonStringerTagWithStringOption(t *testing.T) {
 	a := &Animal{
 		Name: "Fluff",
 		Age:  4,
 	}
 
+	type Dog struct {
+		Animal *Animal `json:"animal,string"`
+		Age    int     `json:"age"`
+	}
+
 	d := &Dog{
 		Animal: a,
+		Age:    3,
 	}
 
 	defer func() {
@@ -1383,13 +1384,15 @@ func TestNonStringerTagWithStringOption(t *testing.T) {
 		}
 	}()
 
-	s := New(d)
-
-	s.TagName = "json"
+	s := New(d, TagName("json"), Stringer(true))
 	m := s.Map()
 
-	if _, exists := m["animal"]; exists {
-		t.Errorf("Value for field Animal should not exist")
+	if _, exists := m["animal"]; !exists {
+		t.Errorf("Value for field Animal should exist")
+	}
+
+	if _, exists := m["age"]; !exists {
+		t.Errorf("Value for field age should exist")
 	}
 }
 

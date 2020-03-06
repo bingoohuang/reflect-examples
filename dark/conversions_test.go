@@ -11,7 +11,7 @@ func TestString(t *testing.T) {
 	b[0], b[1], b[2] = 'b', 'a', 'r'
 
 	if s != "bar" {
-		t.Errorf("String conversion failed, expected %q, got \"bar\"", s)
+		t.Errorf("Stringer conversion failed, expected %q, got \"bar\"", s)
 		return
 	}
 }
@@ -23,7 +23,7 @@ func TestByteSlice(t *testing.T) {
 	b[0], b[1], b[2] = 'b', 'a', 'r'
 
 	if string(b) != "bar" {
-		t.Errorf("String conversion failed, expected %q, got \"bar\"", s)
+		t.Errorf("Stringer conversion failed, expected %q, got \"bar\"", s)
 		return
 	}
 }
