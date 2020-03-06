@@ -18,6 +18,7 @@ The awesome gopher in the logo was taken from [@egonelbre/gophers](https://githu
 
 
 ### Table Of Content
+
 - [Read struct tags](examples/read_struct_tags_test.go)
 - [Get and set struct fields](examples/get_set_struct_fields_test.go)
 - [Fill slice with values](examples/fill_slice_string_test.go)
@@ -28,11 +29,13 @@ The awesome gopher in the logo was taken from [@egonelbre/gophers](https://githu
 - [Check if the underlying type implements an interface](examples/type_impl_interface_test.go)
 - [Wrap a `reflect.Value` with pointer (`T` => `*T`)](examples/wrap_with_pointer_test.go)
 - Function calls
+
   - [Call to a method without prameters, and without return value](examples/function_call_test.go)
   - [Call to a function with list of arguments, and validate return values](examples/function_call_args_test.go)
   - [Call to a function dynamically. similar to the template/text package](examples/function_call_dynamic_test.go)
   - [Call to a function with variadic parameter](examples/function_call_varargs_test.go)
   - [Create function at runtime](examples/function_create_test.go)
+
 - [Deep copy struct](examples/deepcopy_test.go)
 - [Fore export private](examples/forceexport_test.go)
 - [Getting and setting fields, Listing fields/methods](examples/reflector_test.go)
@@ -69,3 +72,5 @@ The awesome gopher in the logo was taken from [@egonelbre/gophers](https://githu
 1. [Golang reflector](https://github.com/tkrajina/go-reflector)
 1. [Copier for golang, copy value from struct to struct and more](https://github.com/jinzhu/copier)
 1. [DeepCopy makes deep copies of things: unexported field values are not copied](https://github.com/mohae/deepcopy)
+1. [Golang package for editing struct's fields during runtime and mapping structs to other structs.](https://github.com/Ompluscator/dynamic-struct)
+
