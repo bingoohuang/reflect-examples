@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	forceexport "github.com/alangpierce/go-forceexport"
+	"github.com/alangpierce/go-forceexport"
 )
 
 func TestForExport(t *testing.T) {

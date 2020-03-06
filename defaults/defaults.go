@@ -11,17 +11,26 @@ import (
 // ErrInvalidType is the error for non-struct pointer
 var ErrInvalidType = errors.New("not a struct pointer")
 
-const (
-	fieldName = "default"
-)
+// Option is the options for Validate.
+type Option struct {
+	TagName string
+}
+
+// OptionFn is the function prototype to apply option
+type OptionFn func(*Option)
+
+// TagName defines the tag name for validate.
+func TagName(tagName string) OptionFn { return func(o *Option) { o.TagName = tagName } }
 
 // Set initializes members in a struct referenced by a pointer.
 // Maps and slices are initialized by `make` and other primitive types are set with default values.
 // `ptr` should be a struct pointer
-func Set(ptr interface{}) error {
+func Set(ptr interface{}, optionFns ...OptionFn) error {
 	if reflect.TypeOf(ptr).Kind() != reflect.Ptr {
 		return ErrInvalidType
 	}
+
+	option := createOption(optionFns)
 
 	v := reflect.ValueOf(ptr).Elem()
 	t := v.Type()
@@ -31,7 +40,7 @@ func Set(ptr interface{}) error {
 	}
 
 	for i := 0; i < t.NumField(); i++ {
-		if defaultVal := t.Field(i).Tag.Get(fieldName); defaultVal != "-" {
+		if defaultVal := t.Field(i).Tag.Get(option.TagName); defaultVal != "-" {
 			if err := setField(v.Field(i), defaultVal); err != nil {
 				return err
 			}
@@ -39,6 +48,20 @@ func Set(ptr interface{}) error {
 	}
 
 	return nil
+}
+
+func createOption(optionFns []OptionFn) *Option {
+	option := &Option{}
+
+	for _, fn := range optionFns {
+		fn(option)
+	}
+
+	if option.TagName == "" {
+		option.TagName = "default"
+	}
+
+	return option
 }
 
 func setField(field reflect.Value, v string) error {
