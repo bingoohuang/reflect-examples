@@ -7,7 +7,7 @@ import (
 	"reflect"
 
 	"github.com/averagesecurityguy/random"
-	"github.com/thoas/go-funk"
+	funk "github.com/thoas/go-funk"
 )
 
 // EnsureSliceLen grows the slice capability

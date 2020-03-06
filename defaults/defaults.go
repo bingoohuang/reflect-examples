@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/bingoohuang/goreflect"
 )
 
 // ErrInvalidType is the error for non-struct pointer
@@ -40,10 +42,13 @@ func Set(ptr interface{}, optionFns ...OptionFn) error {
 	}
 
 	for i := 0; i < t.NumField(); i++ {
-		if defaultVal := t.Field(i).Tag.Get(option.TagName); defaultVal != "-" {
-			if err := setField(v.Field(i), defaultVal); err != nil {
-				return err
-			}
+		defaultVal := t.Field(i).Tag.Get(option.TagName)
+		if defaultVal == "-" {
+			continue
+		}
+
+		if err := setField(v.Field(i), defaultVal); err != nil {
+			return err
 		}
 	}
 
@@ -343,7 +348,7 @@ func convertStruct(t reflect.Type, v string) (reflect.Value, error) {
 }
 
 func hasInitialValue(field reflect.Value) bool {
-	return reflect.DeepEqual(reflect.Zero(field.Type()).Interface(), field.Interface())
+	return goreflect.IsEmptyValue(field)
 }
 
 func shouldInitializeField(field reflect.Value, defaultVal string) bool {

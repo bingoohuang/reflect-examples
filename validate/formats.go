@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/leodido/go-urn"
+	urn "github.com/leodido/go-urn"
 )
 
 // FormatType is used for format validator type definitions.
