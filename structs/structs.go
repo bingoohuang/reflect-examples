@@ -546,56 +546,76 @@ func (s *Struct) nested(val reflect.Value) interface{} {
 
 	switch v.Kind() {
 	case reflect.Struct:
-		n := New(val.Interface())
-		n.Option = s.Option
-		m := n.Map()
-
-		// do not add the converted value if there are no exported fields, ie: time.Time
-		if len(m) > 0 {
-			return m
-		}
+		return s.dealStructValue(val)
 	case reflect.Map:
-		// get the element type of the map
-		mapElem := val.Type()
-
-		switch mapElem.Kind() {
-		case reflect.Ptr, reflect.Array, reflect.Map, reflect.Slice, reflect.Chan:
-			mapElem = mapElem.Elem()
-			if mapElem.Kind() == reflect.Ptr {
-				mapElem = mapElem.Elem()
-			}
-		}
-
-		// only iterate over struct types, ie: map[string]StructType,
-		// map[string][]StructType,
-		if mapElem.Kind() == reflect.Struct ||
-			(mapElem.Kind() == reflect.Slice && mapElem.Elem().Kind() == reflect.Struct) {
-			m := make(map[string]interface{}, val.Len())
-			for _, k := range val.MapKeys() {
-				m[k.String()] = s.nested(val.MapIndex(k))
-			}
-
-			return m
-		}
+		return s.dealMapValue(val)
 	case reflect.Slice, reflect.Array:
-		if val.Type().Kind() == reflect.Interface {
-			return val.Interface()
+		return s.dealSliceArrayValue(val)
+	}
+
+	return val.Interface()
+}
+
+func (s *Struct) dealSliceArrayValue(val reflect.Value) interface{} {
+	if val.Type().Kind() == reflect.Interface {
+		return val.Interface()
+	}
+
+	// do not iterate of non struct types, just pass the value. i. e: []int,
+	// []string, co... We only iterate further if it's a struct. i.e []foo or []*foo
+	vte := val.Type().Elem()
+	if vte.Kind() != reflect.Struct &&
+		!(vte.Kind() == reflect.Ptr && vte.Elem().Kind() == reflect.Struct) {
+		return val.Interface()
+	}
+
+	slices := make([]interface{}, val.Len())
+	for x := 0; x < val.Len(); x++ {
+		slices[x] = s.nested(val.Index(x))
+	}
+
+	return slices
+}
+
+func (s *Struct) dealMapValue(val reflect.Value) interface{} {
+	// get the element type of the map
+	mapElem := val.Type()
+
+	switch mapElem.Kind() {
+	case reflect.Ptr, reflect.Array, reflect.Map, reflect.Slice, reflect.Chan:
+		mapElem = mapElem.Elem()
+		if mapElem.Kind() == reflect.Ptr {
+			mapElem = mapElem.Elem()
+		}
+	}
+
+	// only iterate over struct types, ie: map[string]StructType,
+	// map[string][]StructType,
+	if mapElem.Kind() == reflect.Struct ||
+		(mapElem.Kind() == reflect.Slice && mapElem.Elem().Kind() == reflect.Struct) {
+		m := make(map[string]interface{}, val.Len())
+		for _, k := range val.MapKeys() {
+			m[k.String()] = s.nested(val.MapIndex(k))
 		}
 
-		// do not iterate of non struct types, just pass the value. i. e: []int,
-		// []string, co... We only iterate further if it's a struct. i.e []foo or []*foo
-		vte := val.Type().Elem()
-		if vte.Kind() != reflect.Struct &&
-			!(vte.Kind() == reflect.Ptr && vte.Elem().Kind() == reflect.Struct) {
-			return val.Interface()
-		}
+		return m
+	}
 
-		slices := make([]interface{}, val.Len())
-		for x := 0; x < val.Len(); x++ {
-			slices[x] = s.nested(val.Index(x))
-		}
+	return val.Interface()
+}
 
-		return slices
+func (s *Struct) dealStructValue(val reflect.Value) interface{} {
+	if goreflect.AsError(val.Type()) {
+		return val.Interface().(error).Error()
+	}
+
+	n := New(val.Interface())
+	n.Option = s.Option
+	m := n.Map()
+
+	// do not add the converted value if there are no exported fields, ie: time.Time
+	if len(m) > 0 {
+		return m
 	}
 
 	return val.Interface()

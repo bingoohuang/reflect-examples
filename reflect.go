@@ -1,6 +1,8 @@
 package goreflect
 
-import "reflect"
+import (
+	"reflect"
+)
 
 // IsEmpty returns if the object is considered as empty or not.
 func IsEmpty(value interface{}) bool {
@@ -41,3 +43,28 @@ func IndirectAll(v reflect.Value) reflect.Value {
 
 	return v
 }
+
+// 参考 https://github.com/uber-go/dig/blob/master/types.go
+// nolint gochecknoglobals
+var (
+	_errType = reflect.TypeOf((*error)(nil)).Elem()
+)
+
+// ImplType tells src whether it implements target type.
+func ImplType(src, target reflect.Type) bool {
+	if src == target {
+		return true
+	}
+
+	if src.Kind() == reflect.Ptr {
+		return src.Implements(target)
+	}
+
+	return reflect.PtrTo(src).Implements(target)
+}
+
+// IsError tells t whether it is error type exactly.
+func IsError(t reflect.Type) bool { return t == _errType }
+
+// AsError tells t whether it implements error type exactly.
+func AsError(t reflect.Type) bool { return ImplType(t, _errType) }

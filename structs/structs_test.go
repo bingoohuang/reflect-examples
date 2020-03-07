@@ -2,6 +2,7 @@
 package structs
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -44,6 +45,32 @@ func TestStructIndexes(t *testing.T) {
 	_ = Values(&C{})
 	_ = IsZero(&C{})
 	_ = HasZero(&C{})
+}
+
+type MyError struct {
+	Msg string
+}
+
+func (m *MyError) Error() string {
+	return m.Msg
+}
+
+func TestErr(t *testing.T) {
+
+	var T = struct {
+		C error
+		D error
+	}{
+		C: errors.New("error occurred"),
+		D: &MyError{Msg: "hahah"},
+	}
+
+	a := Map(T)
+
+	assert.Equal(t, map[string]interface{}{
+		"C": "error occurred",
+		"D": "hahah",
+	}, a)
 }
 
 func TestMap(t *testing.T) {
