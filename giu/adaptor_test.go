@@ -74,33 +74,46 @@ func TestUMP(t *testing.T) {
 	resp := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(resp)
 
+	ptrAuthUser := true
 	r.Use(func(c *gin.Context) {
-		c.Set("AuthUser", &AuthUser{Name: "TestAuthUser"})
+		if ptrAuthUser {
+			c.Set("AuthUser", &AuthUser{Name: "TestAuthUser"})
+		} else {
+			c.Set("AuthUser", AuthUser{Name: "TestAuthUser"})
+		}
+
+		ptrAuthUser = !ptrAuthUser
 	})
 
-	ga.GET(r, "/GetAge1/:name", func(user AuthUser, name string) string {
+	type MyObject struct {
+		Name string
+	}
+
+	gr := ga.Route(r)
+	gr.Use(func() *MyObject { return &MyObject{Name: "Test"} })
+	gr.GET("/MyObject1", func(m MyObject) string { return m.Name })
+	gr.GET("/MyObject2", func(m *MyObject) string { return m.Name })
+	gr.GET("/GetAge1/:name", func(user AuthUser, name string) string {
 		return user.Name + "/" + name
 	}, giu.Params(giu.URLParam("name")))
-	ga.GET(r, "/GetAge2/:name", func(name string, user AuthUser) string {
+	gr.GET("/GetAge2/:name", func(name string, user AuthUser) string {
 		return user.Name + "/" + name
 	}, giu.Params(giu.URLParam("name")))
-	ga.GET(r, "/GetAge3/:name", func(user *AuthUser, name string) string {
+	gr.GET("/GetAge3/:name", func(user *AuthUser, name string) string {
 		return user.Name + "/" + name
 	}, giu.Params(giu.URLParam("name")))
-	ga.GET(r, "/GetAge4/:name", func(name string, user *AuthUser) string {
+	gr.GET("/GetAge4/:name", func(name string, user *AuthUser) string {
 		return user.Name + "/" + name
 	}, giu.Params(giu.URLParam("name")))
-	ga.POST(r, "/SetAge", func(req SetAgeReq) SetAgeRsp {
+	gr.POST("/SetAge", func(req SetAgeReq) SetAgeRsp {
 		return SetAgeRsp{Name: fmt.Sprintf("%s:%d", req.Name, req.Age)}
 	})
-
-	ga.GET(r, "/Get/:name/:age", func(name string, age int) (Rsp, error) {
+	gr.GET("/Get/:name/:age", func(name string, age int) (Rsp, error) {
 		return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 	}, giu.Params(giu.URLParam("name"), giu.URLParam("age")))
-
-	ga.GET(r, "/error", func() error { return errors.New("error occurred") })
-
-	ga.GET(r, "/ok", func() error { return nil })
+	gr.GET("/error", func() error { return errors.New("error occurred") })
+	gr.GET("/ok", func() error { return nil })
+	gr.GET("/url", func(c *gin.Context) string { return c.Request.URL.String() })
 
 	c.Request, _ = http.NewRequest(http.MethodGet, "/GetAge1/bingoo", nil)
 	r.ServeHTTP(resp, c.Request)
@@ -159,6 +172,27 @@ func TestUMP(t *testing.T) {
 	rsp, _ = json.Marshal(Rsp{State: http.StatusOK, Data: "bingoo:100"})
 	body, _ = ioutil.ReadAll(resp.Body)
 	assert.Equal(t, string(rsp), strings.TrimSpace(string(body)))
+
+	c.Request, _ = http.NewRequest(http.MethodGet, "/url", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(t, http.StatusOK, resp.Code)
+	rsp, _ = json.Marshal(Rsp{State: http.StatusOK, Data: "/url"})
+	body, _ = ioutil.ReadAll(resp.Body)
+	assert.Equal(t, string(rsp), strings.TrimSpace(string(body)))
+
+	c.Request, _ = http.NewRequest(http.MethodGet, "/MyObject1", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(t, http.StatusOK, resp.Code)
+	rsp, _ = json.Marshal(Rsp{State: http.StatusOK, Data: "Test"})
+	body, _ = ioutil.ReadAll(resp.Body)
+	assert.Equal(t, string(rsp), strings.TrimSpace(string(body)))
+
+	c.Request, _ = http.NewRequest(http.MethodGet, "/MyObject2", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(t, http.StatusOK, resp.Code)
+	rsp, _ = json.Marshal(Rsp{State: http.StatusOK, Data: "Test"})
+	body, _ = ioutil.ReadAll(resp.Body)
+	assert.Equal(t, string(rsp), strings.TrimSpace(string(body)))
 }
 
 func TestHello(t *testing.T) {
@@ -168,8 +202,10 @@ func TestHello(t *testing.T) {
 	hello := ""
 	world := ""
 
-	ga.GET(r, "/hello/:arg", func(v string) { hello = v }, giu.Params(giu.URLParam("arg")))
-	ga.GET(r, "/world", func(v string) { world = v }, giu.Params(giu.QueryParam("arg")))
+	gr := ga.Route(r)
+
+	gr.GET("/hello/:arg", func(v string) { hello = v }, giu.Params(giu.URLParam("arg")))
+	gr.GET("/world", func(v string) { world = v }, giu.Params(giu.QueryParam("arg")))
 
 	c.Request, _ = http.NewRequest(http.MethodGet, "/hello/bingoo", nil)
 	r.ServeHTTP(resp, c.Request)

@@ -20,7 +20,9 @@ type Adaptor struct {
 
 // NewAdaptor makes a new Adaptor.
 func NewAdaptor() *Adaptor {
-	return &Adaptor{register: make(map[reflect.Type]TypeProcessor)}
+	return &Adaptor{
+		register: make(map[reflect.Type]TypeProcessor),
+	}
 }
 
 // RegisterTypeProcessor register a type processor for the type.
@@ -146,77 +148,21 @@ var _ Param = (*queryParam)(nil)
 
 // Option defines the adatpor's option.
 type Option struct {
-	Params []Param
+	Params     []Param
+	MiddleWare bool
 }
 
 // OptionFn is the function prototype to apply option.
 type OptionFn func(*Option)
 
 // Params defines the params for the adaptor.
-func Params(params ...Param) OptionFn {
-	return func(option *Option) {
-		option.Params = params
-	}
-}
+func Params(ps ...Param) OptionFn { return func(option *Option) { option.Params = ps } }
 
-// Handle registers a new request handle and middleware with the given path and method.
-// The last handler should be the real handler, the other ones should be middleware
-// that can and should be shared among different routes.
-// See the example code in GitHub.
-//
-// For GET, POST, PUT, PATCH and DELETE requests the respective shortcut
-// functions can be used.
-//
-// This function is intended for bulk loading and to allow the usage of less
-// frequently used, non-standardized or custom methods (e.g. for internal
-// communication with a proxy).
-func (a *Adaptor) Handle(r gin.IRoutes, httpMethod, relativePath string, h interface{}, fns ...OptionFn) gin.IRoutes {
-	return r.Handle(httpMethod, relativePath, a.Adapt(h, fns...))
-}
-
-// POST is a shortcut for router.Handle("POST", path, handle).
-func (a *Adaptor) POST(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
-	return a.Handle(r, "POST", relativePath, h, optionFns...)
-}
-
-// GET is a shortcut for router.Handle("GET", path, handle).
-func (a *Adaptor) GET(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
-	return a.Handle(r, "GET", relativePath, h, optionFns...)
-}
-
-// DELETE is a shortcut for router.Handle("DELETE", path, handle).
-func (a *Adaptor) DELETE(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
-	return a.Handle(r, "DELETE", relativePath, h, optionFns...)
-}
-
-// PATCH is a shortcut for router.Handle("PATCH", path, handle).
-func (a *Adaptor) PATCH(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
-	return a.Handle(r, "PATCH", relativePath, h, optionFns...)
-}
-
-// PUT is a shortcut for router.Handle("PUT", path, handle).
-func (a *Adaptor) PUT(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
-	return a.Handle(r, "PUT", relativePath, h, optionFns...)
-}
-
-// OPTIONS is a shortcut for router.Handle("OPTIONS", path, handle).
-func (a *Adaptor) OPTIONS(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
-	return a.Handle(r, "OPTIONS", relativePath, h, optionFns...)
-}
-
-// HEAD is a shortcut for router.Handle("HEAD", path, handle).
-func (a *Adaptor) HEAD(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
-	return a.Handle(r, "HEAD", relativePath, h, optionFns...)
-}
-
-// Any registers a route that matches all the HTTP methods.
-// GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE, CONNECT, TRACE.
-func (a *Adaptor) Any(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
-	return r.Any(relativePath, a.Adapt(h, optionFns...))
-}
+// MiddleWare defines the middleWare flag for the adaptor.
+func MiddleWare(m bool) OptionFn { return func(option *Option) { option.MiddleWare = m } }
 
 // Adapt adapts convenient function to gi.HandleFunc.
-func (a *Adaptor) Adapt(fn interface{}, optionFns ...OptionFn) gin.HandlerFunc {
+func (a *Adaptor) Adapt(fn HandlerFunc, optionFns ...OptionFn) gin.HandlerFunc {
 	option := &Option{}
 
 	for _, f := range optionFns {
@@ -236,13 +182,13 @@ func (a *Adaptor) Adapt(fn interface{}, optionFns ...OptionFn) gin.HandlerFunc {
 
 		r := fv.Call(argVs)
 
-		if err := a.processOut(c, fv, r); err != nil {
+		if err := a.processOut(c, fv, r, option); err != nil {
 			_, _ = errTp(c, err)
 		}
 	}
 }
 
-func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value) error {
+func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value, option *Option) error {
 	ft := fv.Type()
 	numOut := ft.NumOut()
 
@@ -260,14 +206,33 @@ func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value
 
 	vs := make([]interface{}, numOut)
 
+	a.registerInjects(c, option, numOut, r)
+
 	for i := 0; i < numOut; i++ {
 		vs[i] = r[i].Interface()
+	}
+
+	if option.MiddleWare {
+		return nil
 	}
 
 	p := a.findTypeProcessorOr(SuccessfullyInvokedType, defaultSuccessProcessor)
 	_, _ = p(c, vs...)
 
 	return nil
+}
+
+func (a *Adaptor) registerInjects(c *gin.Context, option *Option, numOut int, r []reflect.Value) {
+	if !option.MiddleWare {
+		return
+	}
+
+	for i := 0; i < numOut; i++ {
+		nonPtrRi := convertPtr(false, r[i])
+		if nonPtrRi.Kind() == reflect.Struct {
+			c.Set("_inject_"+nonPtrRi.Type().String(), convertPtr(true, r[i]))
+		}
+	}
 }
 
 func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) ([]reflect.Value, error) {
@@ -281,7 +246,7 @@ func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (
 		argType, argKind, isArgTypePtr := parseArgs(ft, i)
 		switch argKind {
 		case reflect.Struct:
-			v, err := a.processStruct(c, argType)
+			v, err := a.processStruct(c, argType, isArgTypePtr)
 			if err != nil {
 				return nil, err
 			}
@@ -326,7 +291,15 @@ func parseArgs(ft reflect.Type, argIndex int) (reflect.Type, reflect.Kind, bool)
 	return argType, argType.Kind(), isArgTypePtr
 }
 
-func (a *Adaptor) processStruct(c *gin.Context, argType reflect.Type) (reflect.Value, error) {
+func (a *Adaptor) processStruct(c *gin.Context, argType reflect.Type, isArgTypePtr bool) (reflect.Value, error) {
+	if isArgTypePtr && argType == GetNonPtrType(c) { // 直接注入gin.Context
+		return reflect.ValueOf(c), nil
+	}
+
+	if v, exists := c.Get("_inject_" + argType.String()); exists {
+		return convertPtr(isArgTypePtr, v.(reflect.Value)), nil
+	}
+
 	if tp := a.findTypeProcessor(argType); tp != nil {
 		v, err := tp(c, argType)
 		if err != nil {
@@ -358,3 +331,110 @@ func convertPtr(isPtr bool, v reflect.Value) reflect.Value {
 
 	return p
 }
+
+// Handle registers a new request handle and middleware with the given path and method.
+// The last handler should be the real handler, the other ones should be middleware
+// that can and should be shared among different routes.
+// See the example code in GitHub.
+//
+// For GET, POST, PUT, PATCH and DELETE requests the respective shortcut
+// functions can be used.
+//
+// This function is intended for bulk loading and to allow the usage of less
+// frequently used, non-standardized or custom methods (e.g. for internal
+// communication with a proxy).
+func (a *Routes) Handle(httpMethod, relativePath string, h HandlerFunc, fns ...OptionFn) IRoutes {
+	a.GinRoutes.Handle(httpMethod, relativePath, a.Adaptor.Adapt(h, fns...))
+	return a
+}
+
+// POST is a shortcut for router.Handle("POST", path, handle).
+func (a *Routes) POST(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
+	a.GinRoutes.Handle("POST", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	return a
+}
+
+// GET is a shortcut for router.Handle("GET", path, handle).
+func (a *Routes) GET(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
+	a.GinRoutes.Handle("GET", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	return a
+}
+
+// DELETE is a shortcut for router.Handle("DELETE", path, handle).
+func (a *Routes) DELETE(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
+	a.GinRoutes.Handle("DELETE", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	return a
+}
+
+// PATCH is a shortcut for router.Handle("PATCH", path, handle).
+func (a *Routes) PATCH(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
+	a.GinRoutes.Handle("PATCH", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	return a
+}
+
+// PUT is a shortcut for router.Handle("PUT", path, handle).
+func (a *Routes) PUT(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
+	a.GinRoutes.Handle("PUT", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	return a
+}
+
+// OPTIONS is a shortcut for router.Handle("OPTIONS", path, handle).
+func (a *Routes) OPTIONS(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
+	a.GinRoutes.Handle("OPTIONS", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	return a
+}
+
+// HEAD is a shortcut for router.Handle("HEAD", path, handle).
+func (a *Routes) HEAD(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
+	a.GinRoutes.Handle("HEAD", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	return a
+}
+
+// Any registers a route that matches all the HTTP methods.
+// GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE, CONNECT, TRACE.
+func (a *Routes) Any(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
+	a.GinRoutes.Any(relativePath, a.Adaptor.Adapt(h, optionFns...))
+	return a
+}
+
+// HandlerFunc defines the handler used by gin middleware as return value.
+type HandlerFunc interface {
+}
+
+// IRoutes defines all router handle interface.
+type IRoutes interface {
+	Use(HandlerFunc, ...OptionFn) IRoutes
+
+	Handle(string, string, HandlerFunc, ...OptionFn) IRoutes
+	Any(string, HandlerFunc, ...OptionFn) IRoutes
+	GET(string, HandlerFunc, ...OptionFn) IRoutes
+	POST(string, HandlerFunc, ...OptionFn) IRoutes
+	DELETE(string, HandlerFunc, ...OptionFn) IRoutes
+	PATCH(string, HandlerFunc, ...OptionFn) IRoutes
+	PUT(string, HandlerFunc, ...OptionFn) IRoutes
+	OPTIONS(string, HandlerFunc, ...OptionFn) IRoutes
+	HEAD(string, HandlerFunc, ...OptionFn) IRoutes
+}
+
+// Route makes a route for Adaptor.
+func (a *Adaptor) Route(r gin.IRoutes) IRoutes {
+	return &Routes{GinRoutes: r, Adaptor: a}
+}
+
+// Routes defines adaptor routes implemetation for IRoutes.
+type Routes struct {
+	GinRoutes gin.IRoutes
+	Adaptor   *Adaptor
+}
+
+// Use adds middleware, see example code.
+func (a *Routes) Use(h HandlerFunc, optionFns ...OptionFn) IRoutes {
+	fns := make([]OptionFn, len(optionFns)+1) // nolint gomnd
+	copy(fns, optionFns)
+	fns[len(optionFns)] = MiddleWare(true)
+	a.GinRoutes.Use(a.Adaptor.Adapt(h, fns...))
+
+	return a
+}
+
+var _ IRoutes = (*Routes)(nil)
