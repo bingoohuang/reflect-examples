@@ -45,42 +45,37 @@ func TestUMP(t *testing.T) {
 	}
 
 	// 注册如何处理成功返回一个值
-	ga.RegisterTypeProcessor(giu.SuccessfullyInvokedType, func(v interface{}, c *gin.Context) (interface{}, error) {
-		if rsp, ok := v.(Rsp); ok {
+	ga.RegisterTypeProcessor(giu.SuccessfullyInvokedType, func(c *gin.Context, vs ...interface{}) (interface{}, error) {
+		if len(vs) == 0 {
+			c.JSON(http.StatusOK, Rsp{State: http.StatusOK, Data: "ok"}) // 如何处理无返回(单独error返回除外)
+		} else if rsp, ok := vs[0].(Rsp); ok { // 返回已经是Rsp类型，不再包装
 			c.JSON(http.StatusOK, rsp)
 		} else {
-			c.JSON(http.StatusOK, Rsp{State: http.StatusOK, Data: v})
+			c.JSON(http.StatusOK, Rsp{State: http.StatusOK, Data: vs[0]}) // 选取第一个返回参数，JSON返回
 		}
 
 		return nil, nil
 	})
 
 	// 注册如何处理错误
-	ga.RegisterTypeProcessor(goreflect.ErrType, func(v interface{}, c *gin.Context) (interface{}, error) {
-		c.JSON(http.StatusOK, Rsp{State: http.StatusInternalServerError, Data: v.(error).Error()})
+	ga.RegisterTypeProcessor(goreflect.ErrType, func(c *gin.Context, vs ...interface{}) (interface{}, error) {
+		c.JSON(http.StatusOK, Rsp{State: http.StatusInternalServerError, Data: vs[0].(error).Error()})
 
 		return nil, nil
 	})
 
 	// 注册如何处理AuthUser类型的输入参数
-	ga.RegisterTypeProcessor(AuthUser{}, func(v interface{}, c *gin.Context) (interface{}, error) {
+	ga.RegisterTypeProcessor(AuthUser{}, func(c *gin.Context, vs ...interface{}) (interface{}, error) {
 		authUser, _ := c.Get("AuthUser")
 
 		return authUser, nil
-	})
-
-	// 注册如何处理无返回(单独error返回除外)
-	ga.RegisterTypeProcessor(giu.EmptyResultInvokedType, func(_ interface{}, c *gin.Context) (interface{}, error) {
-		c.JSON(http.StatusOK, Rsp{State: http.StatusOK, Data: "ok"})
-
-		return nil, nil
 	})
 
 	resp := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(resp)
 
 	r.Use(func(c *gin.Context) {
-		c.Set("AuthUser", AuthUser{Name: "TestAuthUser"})
+		c.Set("AuthUser", &AuthUser{Name: "TestAuthUser"})
 	})
 
 	r.GET("/GetAge1/:name", ga.Adapt(func(user AuthUser, name string) string {

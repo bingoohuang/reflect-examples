@@ -11,7 +11,7 @@ import (
 )
 
 // TypeProcessor is the processor for a specified type.
-type TypeProcessor func(interface{}, *gin.Context) (interface{}, error)
+type TypeProcessor func(*gin.Context, ...interface{}) (interface{}, error)
 
 // Adaptor is the adaptor structure for gin.HandlerFunc.
 type Adaptor struct {
@@ -58,17 +58,6 @@ var (
 	SuccessfullyInvokedType = reflect.TypeOf((*SuccessfullyInvoked)(nil)).Elem()
 )
 
-// EmptyResultInvoked represents the adaptor is invoked successfully but without return.
-type EmptyResultInvoked interface {
-	EmptyResultInvoked()
-}
-
-var (
-	// EmptyResultInvokedType defines the non-returned adaptor invoke's type.
-	// nolint gochecknoglobals
-	EmptyResultInvokedType = reflect.TypeOf((*EmptyResultInvoked)(nil)).Elem()
-)
-
 // GetNonPtrType returns the non-ptr type of v.
 func GetNonPtrType(v interface{}) reflect.Type {
 	if vt, ok := v.(reflect.Type); ok {
@@ -95,22 +84,21 @@ type StateCodeError interface {
 	GetStateCode() int
 }
 
-func defaultSuccessProcessor(v interface{}, g *gin.Context) (interface{}, error) {
-	g.JSON(http.StatusOK, v)
+func defaultSuccessProcessor(g *gin.Context, vs ...interface{}) (interface{}, error) {
+	if len(vs) > 0 {
+		g.JSON(http.StatusOK, vs[0])
+	}
+
 	return nil, nil
 }
 
-func defaultEmptyProcessor(v interface{}, g *gin.Context) (interface{}, error) {
-	return nil, nil
-}
-
-func defaultErrorProcessor(v interface{}, g *gin.Context) (interface{}, error) {
+func defaultErrorProcessor(g *gin.Context, vs ...interface{}) (interface{}, error) {
 	code := 500
-	if sce, ok := v.(StateCodeError); ok {
+	if sce, ok := vs[0].(StateCodeError); ok {
 		code = sce.GetStateCode()
 	}
 
-	_ = g.AbortWithError(code, v.(error))
+	_ = g.AbortWithError(code, vs[0].(error))
 
 	return nil, nil
 }
@@ -185,7 +173,7 @@ func (a *Adaptor) Adapt(fn interface{}, optionFns ...OptionFn) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		argVs, err := a.createArgs(c, fv, option)
 		if err != nil {
-			_, _ = errTp(err, c)
+			_, _ = errTp(c, err)
 
 			return
 		}
@@ -193,7 +181,7 @@ func (a *Adaptor) Adapt(fn interface{}, optionFns ...OptionFn) gin.HandlerFunc {
 		r := fv.Call(argVs)
 
 		if err := a.processOut(c, fv, r); err != nil {
-			_, _ = errTp(err, c)
+			_, _ = errTp(c, err)
 		}
 	}
 }
@@ -206,25 +194,22 @@ func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value
 		return nil
 	}
 
-	lastError := false
-
 	if goreflect.AsError(ft.Out(numOut - 1)) { // nolint gomnd
-		lastError = true
-
 		if !r[numOut-1].IsNil() {
 			return r[numOut-1].Interface().(error)
 		}
+
+		numOut-- // drop the error returned by the adapted.
 	}
 
-	if numOut == 1 && lastError {
-		p := a.findTypeProcessorOr(EmptyResultInvokedType, defaultEmptyProcessor)
-		_, _ = p(nil, c)
+	vs := make([]interface{}, numOut)
 
-		return nil
+	for i := 0; i < numOut; i++ {
+		vs[i] = r[i].Interface()
 	}
 
 	p := a.findTypeProcessorOr(SuccessfullyInvokedType, defaultSuccessProcessor)
-	_, _ = p(r[0].Interface(), c)
+	_, _ = p(c, vs...)
 
 	return nil
 }
@@ -287,7 +272,7 @@ func parseArgs(ft reflect.Type, argIndex int) (reflect.Type, reflect.Kind, bool)
 
 func (a *Adaptor) processStruct(c *gin.Context, argType reflect.Type) (reflect.Value, error) {
 	if tp := a.findTypeProcessor(argType); tp != nil {
-		v, err := tp(nil, c)
+		v, err := tp(c, argType)
 		if err != nil {
 			return reflect.Value{}, err
 		}
