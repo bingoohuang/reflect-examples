@@ -159,6 +159,62 @@ func Params(params ...Param) OptionFn {
 	}
 }
 
+// Handle registers a new request handle and middleware with the given path and method.
+// The last handler should be the real handler, the other ones should be middleware
+// that can and should be shared among different routes.
+// See the example code in GitHub.
+//
+// For GET, POST, PUT, PATCH and DELETE requests the respective shortcut
+// functions can be used.
+//
+// This function is intended for bulk loading and to allow the usage of less
+// frequently used, non-standardized or custom methods (e.g. for internal
+// communication with a proxy).
+func (a *Adaptor) Handle(r gin.IRoutes, httpMethod, relativePath string, h interface{}, fns ...OptionFn) gin.IRoutes {
+	return r.Handle(httpMethod, relativePath, a.Adapt(h, fns...))
+}
+
+// POST is a shortcut for router.Handle("POST", path, handle).
+func (a *Adaptor) POST(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
+	return a.Handle(r, "POST", relativePath, h, optionFns...)
+}
+
+// GET is a shortcut for router.Handle("GET", path, handle).
+func (a *Adaptor) GET(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
+	return a.Handle(r, "GET", relativePath, h, optionFns...)
+}
+
+// DELETE is a shortcut for router.Handle("DELETE", path, handle).
+func (a *Adaptor) DELETE(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
+	return a.Handle(r, "DELETE", relativePath, h, optionFns...)
+}
+
+// PATCH is a shortcut for router.Handle("PATCH", path, handle).
+func (a *Adaptor) PATCH(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
+	return a.Handle(r, "PATCH", relativePath, h, optionFns...)
+}
+
+// PUT is a shortcut for router.Handle("PUT", path, handle).
+func (a *Adaptor) PUT(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
+	return a.Handle(r, "PUT", relativePath, h, optionFns...)
+}
+
+// OPTIONS is a shortcut for router.Handle("OPTIONS", path, handle).
+func (a *Adaptor) OPTIONS(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
+	return a.Handle(r, "OPTIONS", relativePath, h, optionFns...)
+}
+
+// HEAD is a shortcut for router.Handle("HEAD", path, handle).
+func (a *Adaptor) HEAD(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
+	return a.Handle(r, "HEAD", relativePath, h, optionFns...)
+}
+
+// Any registers a route that matches all the HTTP methods.
+// GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE, CONNECT, TRACE.
+func (a *Adaptor) Any(r gin.IRoutes, relativePath string, h interface{}, optionFns ...OptionFn) gin.IRoutes {
+	return r.Any(relativePath, a.Adapt(h, optionFns...))
+}
+
 // Adapt adapts convenient function to gi.HandleFunc.
 func (a *Adaptor) Adapt(fn interface{}, optionFns ...OptionFn) gin.HandlerFunc {
 	option := &Option{}

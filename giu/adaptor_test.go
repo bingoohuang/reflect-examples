@@ -78,29 +78,29 @@ func TestUMP(t *testing.T) {
 		c.Set("AuthUser", &AuthUser{Name: "TestAuthUser"})
 	})
 
-	r.GET("/GetAge1/:name", ga.Adapt(func(user AuthUser, name string) string {
+	ga.GET(r, "/GetAge1/:name", func(user AuthUser, name string) string {
 		return user.Name + "/" + name
-	}, giu.Params(giu.URLParam("name"))))
-	r.GET("/GetAge2/:name", ga.Adapt(func(name string, user AuthUser) string {
+	}, giu.Params(giu.URLParam("name")))
+	ga.GET(r, "/GetAge2/:name", func(name string, user AuthUser) string {
 		return user.Name + "/" + name
-	}, giu.Params(giu.URLParam("name"))))
-	r.GET("/GetAge3/:name", ga.Adapt(func(user *AuthUser, name string) string {
+	}, giu.Params(giu.URLParam("name")))
+	ga.GET(r, "/GetAge3/:name", func(user *AuthUser, name string) string {
 		return user.Name + "/" + name
-	}, giu.Params(giu.URLParam("name"))))
-	r.GET("/GetAge4/:name", ga.Adapt(func(name string, user *AuthUser) string {
+	}, giu.Params(giu.URLParam("name")))
+	ga.GET(r, "/GetAge4/:name", func(name string, user *AuthUser) string {
 		return user.Name + "/" + name
-	}, giu.Params(giu.URLParam("name"))))
-	r.POST("/SetAge", ga.Adapt(func(req SetAgeReq) SetAgeRsp {
+	}, giu.Params(giu.URLParam("name")))
+	ga.POST(r, "/SetAge", func(req SetAgeReq) SetAgeRsp {
 		return SetAgeRsp{Name: fmt.Sprintf("%s:%d", req.Name, req.Age)}
-	}))
+	})
 
-	r.GET("/Get/:name/:age", ga.Adapt(func(name string, age int) (Rsp, error) {
+	ga.GET(r, "/Get/:name/:age", func(name string, age int) (Rsp, error) {
 		return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
-	}, giu.Params(giu.URLParam("name"), giu.URLParam("age"))))
+	}, giu.Params(giu.URLParam("name"), giu.URLParam("age")))
 
-	r.GET("/error", ga.Adapt(func() error { return errors.New("error occurred") }))
+	ga.GET(r, "/error", func() error { return errors.New("error occurred") })
 
-	r.GET("/ok", ga.Adapt(func() error { return nil }))
+	ga.GET(r, "/ok", func() error { return nil })
 
 	c.Request, _ = http.NewRequest(http.MethodGet, "/GetAge1/bingoo", nil)
 	r.ServeHTTP(resp, c.Request)
@@ -168,8 +168,8 @@ func TestHello(t *testing.T) {
 	hello := ""
 	world := ""
 
-	r.GET("/hello/:arg", ga.Adapt(func(v string) { hello = v }, giu.Params(giu.URLParam("arg"))))
-	r.GET("/world", ga.Adapt(func(v string) { world = v }, giu.Params(giu.QueryParam("arg"))))
+	ga.GET(r, "/hello/:arg", func(v string) { hello = v }, giu.Params(giu.URLParam("arg")))
+	ga.GET(r, "/world", func(v string) { world = v }, giu.Params(giu.QueryParam("arg")))
 
 	c.Request, _ = http.NewRequest(http.MethodGet, "/hello/bingoo", nil)
 	r.ServeHTTP(resp, c.Request)
