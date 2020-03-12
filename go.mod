@@ -5,7 +5,7 @@ go 1.12
 require (
 	github.com/alangpierce/go-forceexport v0.0.0-20160317203124-8f1d6941cd75
 	github.com/averagesecurityguy/random v0.0.0-20180326012618-37cce341d2af
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/gin-gonic/gin v1.5.0
 	github.com/guregu/null v3.4.0+incompatible
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/leodido/go-urn v1.2.0

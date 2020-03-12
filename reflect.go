@@ -47,7 +47,8 @@ func IndirectAll(v reflect.Value) reflect.Value {
 // 参考 https://github.com/uber-go/dig/blob/master/types.go
 // nolint gochecknoglobals
 var (
-	_errType = reflect.TypeOf((*error)(nil)).Elem()
+	// ErrType defines the error's type
+	ErrType = reflect.TypeOf((*error)(nil)).Elem()
 )
 
 // ImplType tells src whether it implements target type.
@@ -60,11 +61,15 @@ func ImplType(src, target reflect.Type) bool {
 		return src.Implements(target)
 	}
 
+	if target.Kind() != reflect.Interface {
+		return false
+	}
+
 	return reflect.PtrTo(src).Implements(target)
 }
 
 // IsError tells t whether it is error type exactly.
-func IsError(t reflect.Type) bool { return t == _errType }
+func IsError(t reflect.Type) bool { return t == ErrType }
 
 // AsError tells t whether it implements error type exactly.
-func AsError(t reflect.Type) bool { return ImplType(t, _errType) }
+func AsError(t reflect.Type) bool { return ImplType(t, ErrType) }
