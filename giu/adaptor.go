@@ -311,7 +311,9 @@ func (a *Adaptor) createArgValues(c *gin.Context, argTags map[int][]reflect.Stru
 	for _, tags := range argTags {
 		for _, tag := range tags {
 			if arg := tag.Get("arg"); arg != "" {
-				a.parseTags(c, arg, args)
+				for _, argItem := range strings.Split(arg, "/") {
+					a.parseTags(c, argItem, args)
+				}
 			}
 		}
 	}

@@ -112,6 +112,7 @@ func TestUMP(t *testing.T) {
 	gr.GET("/Get1/:name/:age", f1, giu.Params(giu.URLParam("name"), giu.URLParam("age")))
 	gr.GET("/Get2/:name/:age", f2)
 	gr.GET("/Get3/:name", f3)
+	gr.GET("/Get31/:name", f31)
 	gr.GET("/Get4", f4)
 
 	assertResults(t, resp, c, r)
@@ -131,13 +132,20 @@ func f2(name string, age int, _ struct {
 
 // f3 processes  /Get3/:name?age=100
 func f3(name string, age int, _ struct {
-	N giu.T `arg:"name,url"`  // name是url变量，通过gin.Context.Param(x)获取
-	A giu.T `arg:"age,query"` // age是query变量，通过gin.Context.Query(x)获取
+	_ giu.T `arg:"name,url"`  // name是url变量，通过gin.Context.Param(x)获取
+	_ giu.T `arg:"age,query"` // age是query变量，通过gin.Context.Query(x)获取
 }) (Rsp, error) {
 	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 }
 
-// f4 processes /Get4?name=bingoo&&age=100
+// f31 processes  /Get3/:name?age=100
+func f31(name string, age int, _ struct {
+	giu.T `arg:"name,url/age,query"`
+}) (Rsp, error) {
+	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
+}
+
+// f4 processes /Get4?name=bingoo&age=100
 func f4(name string, age int, _ struct {
 	giu.T `arg:"name age,query"` // name和age都是query变量，通过gin.Context.Query(x)获取
 }) (Rsp, error) {
@@ -156,7 +164,8 @@ func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context
 	checkStatusOK(t, resp, c, r, "/Get1/bingoo/100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get2/bingoo/100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get3/bingoo?age=100", "bingoo:100")
-	checkStatusOK(t, resp, c, r, "/Get4?name=bingoo&&age=100", "bingoo:100")
+	checkStatusOK(t, resp, c, r, "/Get31/bingoo?age=100", "bingoo:100")
+	checkStatusOK(t, resp, c, r, "/Get4?name=bingoo&age=100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/url", "/url")
 	checkStatusOK(t, resp, c, r, "/MyObject1", "Test")
 	checkStatusOK(t, resp, c, r, "/MyObject2", "Test")
