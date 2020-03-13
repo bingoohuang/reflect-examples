@@ -91,16 +91,16 @@ func TestUMP(t *testing.T) {
 
 	gr.GET("/GetAge1/:name", func(user AuthUser, name string) string {
 		return user.Name + "/" + name
-	}, giu.Params(giu.URLParam("name")))
+	}, giu.Params(giu.URLParams("name")))
 	gr.GET("/GetAge2/:name", func(name string, user AuthUser) string {
 		return user.Name + "/" + name
-	}, giu.Params(giu.URLParam("name")))
+	}, giu.Params(giu.URLParams("name")))
 	gr.GET("/GetAge3/:name", func(user *AuthUser, name string) string {
 		return user.Name + "/" + name
-	}, giu.Params(giu.URLParam("name")))
+	}, giu.Params(giu.URLParams("name")))
 	gr.GET("/GetAge4/:name", func(name string, user *AuthUser) string {
 		return user.Name + "/" + name
-	}, giu.Params(giu.URLParam("name")))
+	}, giu.Params(giu.URLParams("name")))
 	gr.POST("/SetAge", func(req SetAgeReq) SetAgeRsp {
 		return SetAgeRsp{Name: fmt.Sprintf("%s:%d", req.Name, req.Age)}
 	})
@@ -109,7 +109,7 @@ func TestUMP(t *testing.T) {
 	gr.GET("/ok", func() error { return nil })
 	gr.GET("/url", func(c *gin.Context) string { return c.Request.URL.String() })
 
-	gr.GET("/Get1/:name/:age", f1, giu.Params(giu.URLParam("name"), giu.URLParam("age")))
+	gr.GET("/Get1/:name/:age", f1, giu.Params(giu.URLParams("name", "age")))
 	gr.GET("/Get2/:name/:age", f2)
 	gr.GET("/Get3/:name", f3)
 	gr.GET("/Get31/:name", f31)
@@ -204,11 +204,11 @@ func TestHello(t *testing.T) {
 	ga := giu.NewAdaptor()
 	gr := ga.Route(router)
 
-	gr.GET("/hello/:arg", func(v string) { hello = v }, giu.Params(giu.URLParam("arg")))
+	gr.GET("/hello/:arg", func(v string) { hello = v }, giu.Params(giu.URLParams("arg")))
 	gr.GET("/world", func(v string) string {
 		world = v
 		return "hello " + v
-	}, giu.Params(giu.QueryParam("arg")))
+	}, giu.Params(giu.QueryParams("arg")))
 
 	gr.GET("/error", func() error {
 		return errors.New("xxx")

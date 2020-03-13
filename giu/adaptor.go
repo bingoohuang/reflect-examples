@@ -130,18 +130,39 @@ func defaultErrorProcessor(g *gin.Context, vs ...interface{}) (interface{}, erro
 	return nil, nil
 }
 
+// ExpandableParam defines the interface that the param can be expanded to multiples.
+type ExpandableParam interface {
+	// Expands expands one item to multiple items.
+	Expands() []Param
+}
+
 // Param defines the interface to how to get param's value.
 type Param interface {
 	Get(g *gin.Context) string
+}
+
+type urlParams struct {
+	keys []string
+}
+
+// Expands expands one item to multiple items.
+func (u urlParams) Expands() []Param {
+	params := make([]Param, len(u.keys))
+
+	for i, key := range u.keys {
+		params[i] = urlParam{key: key}
+	}
+
+	return params
 }
 
 type urlParam struct {
 	key string
 }
 
-// URLParam defines the URL param in the URL PATH.
-func URLParam(key string) Param {
-	return urlParam{key: key}
+// URLParams defines the URL param in the URL PATH.
+func URLParams(keys ...string) ExpandableParam {
+	return urlParams{keys: keys}
 }
 
 func (u urlParam) Get(g *gin.Context) string {
@@ -150,19 +171,38 @@ func (u urlParam) Get(g *gin.Context) string {
 
 var _ Param = (*urlParam)(nil)
 
+type queryParams struct {
+	keys []string
+}
+
+func (q queryParams) Expands() []Param {
+	params := make([]Param, len(q.keys))
+
+	for i, key := range q.keys {
+		params[i] = queryParam{key: key}
+	}
+
+	return params
+}
+
 type queryParam struct {
 	key          string
 	defaultValue string
+	required     bool
 }
 
-// QueryParam defines the query param.
-func QueryParam(key string) Param {
-	return QueryParamOr(key, "")
+func (u queryParam) Expands() []Param {
+	return []Param{u}
+}
+
+// QueryParams defines the query param.
+func QueryParams(keys ...string) ExpandableParam {
+	return queryParams{keys: keys}
 }
 
 // QueryParamOr defines the query param and the default value when empty.
-func QueryParamOr(key, defaultValue string) Param {
-	return queryParam{key: key, defaultValue: defaultValue}
+func QueryParamOr(key, defaultValue string, required bool) ExpandableParam {
+	return queryParam{key: key, defaultValue: defaultValue, required: required}
 }
 
 func (u queryParam) Get(g *gin.Context) string {
@@ -181,7 +221,17 @@ type Option struct {
 type OptionFn func(*Option)
 
 // Params defines the params for the adaptor.
-func Params(ps ...Param) OptionFn { return func(option *Option) { option.Params = ps } }
+func Params(ps ...ExpandableParam) OptionFn {
+	params := make([]Param, 0)
+
+	for _, p := range ps {
+		params = append(params, p.Expands()...)
+	}
+
+	return func(option *Option) {
+		option.Params = params
+	}
+}
 
 // MiddleWare defines the middleWare flag for the adaptor.
 func MiddleWare(m bool) OptionFn { return func(option *Option) { option.MiddleWare = m } }
