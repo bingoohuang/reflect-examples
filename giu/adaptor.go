@@ -2,6 +2,7 @@ package giu
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -255,7 +256,9 @@ func (a *Adaptor) Adapt(fn HandlerFunc, optionFns ...OptionFn) gin.HandlerFunc {
 			return
 		}
 
+		log.Printf("before call %v", fv.Type())
 		r := fv.Call(argVs)
+		log.Printf("after call %v", fv.Type())
 
 		if err := a.processOut(c, fv, r, option); err != nil {
 			_, _ = errTp(c, err)
@@ -310,68 +313,151 @@ func (a *Adaptor) registerInjects(c *gin.Context, option *Option, numOut int, r 
 	}
 }
 
-func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) ([]reflect.Value, error) {
+type argIn struct {
+	Index          int
+	Type           reflect.Type
+	Kind           reflect.Kind
+	Ptr            bool
+	PrimitiveIndex int
+}
+
+func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (v []reflect.Value, err error) {
 	ft := fv.Type()
 	numIn := ft.NumIn()
 
-	ii := -1
-	argVs := make([]reflect.Value, numIn)
-	argTags := a.findTags(ft)
-	args := a.createArgValues(c, argTags)
+	argIns := parseArgIns(ft)
+	argAsTags := collectTags(argIns)
+	argValuesByTag := createArgValues(c, argAsTags)
+	primitiveArgsNum := countPrimitiveArgs(argIns, argAsTags)
+	pArg := singlePrimitiveValue(c, primitiveArgsNum)
 
-	for i := 0; i < numIn; i++ {
-		argType, argKind, isArgTypePtr := parseArgs(ft, i)
+	v = make([]reflect.Value, numIn)
 
-		if _, isTagArg := argTags[i]; isTagArg {
-			argVs[i] = convertPtr(isArgTypePtr, reflect.New(argType))
+	for i, arg := range argIns {
+		if v[i], err = a.createArgValue(c, argValuesByTag, argAsTags, arg, pArg, option); err != nil {
+			return nil, err
+		}
+	}
+
+	return v, err
+}
+
+func singlePrimitiveValue(c *gin.Context, primitiveArgsNum int) string {
+	if primitiveArgsNum != 1 { // nolint gomnd
+		return ""
+	}
+
+	if len(c.Params) == 1 { // nolint gomnd
+		return c.Params[0].Value
+	}
+
+	q := c.Request.URL.Query()
+	if len(q) == 1 { // nolint gomnd
+		for _, v := range q {
+			return v[0]
+		}
+	}
+
+	return ""
+}
+
+func countPrimitiveArgs(argIns []argIn, argAsTags map[int][]reflect.StructTag) int {
+	primitiveArgsNum := 0
+
+	for i, arg := range argIns {
+		if _, ok := argAsTags[i]; ok || arg.Kind == reflect.Struct {
 			continue
 		}
 
-		switch argKind {
-		case reflect.Struct:
-			v, err := a.processStruct(c, argType, isArgTypePtr)
-			if err != nil {
-				return nil, err
-			}
-
-			argVs[i] = convertPtr(isArgTypePtr, v)
-		default:
-			ii++
-			argII, ok := args[ii]
-
-			if !ok && ii < len(option.Params) {
-				argII = option.Params[ii].Get(c)
-			}
-
-			v, err := dealDirectParamArg(argII, argKind)
-			if err != nil {
-				return nil, err
-			}
-
-			argVs[i] = convertPtr(isArgTypePtr, reflect.ValueOf(v))
-		}
+		argIns[i].PrimitiveIndex = primitiveArgsNum
+		primitiveArgsNum++
 	}
 
-	return argVs, nil
+	return primitiveArgsNum
 }
 
-func (a *Adaptor) createArgValues(c *gin.Context, argTags map[int][]reflect.StructTag) map[int]string {
+func (a *Adaptor) createArgValue(c *gin.Context, argValuesByTag map[int]string,
+	argAsTags map[int][]reflect.StructTag, arg argIn, singleArgValue string, option *Option) (reflect.Value, error) {
+	if _, ok := argAsTags[arg.Index]; ok {
+		return convertPtr(arg.Ptr, reflect.New(arg.Type)), nil
+	}
+
+	if arg.Kind == reflect.Struct {
+		v, err := a.processStruct(c, arg)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+
+		return convertPtr(arg.Ptr, v), nil
+	}
+
+	if arg.PrimitiveIndex < 0 {
+		return reflect.Value{}, fmt.Errorf("unable to parse arg%d for %s", arg.Index, arg.Type)
+	}
+
+	if v, ok := argValuesByTag[arg.PrimitiveIndex]; ok {
+		return convertValue(v, arg)
+	}
+
+	if arg.PrimitiveIndex < len(option.Params) {
+		v := option.Params[arg.PrimitiveIndex].Get(c)
+		return convertValue(v, arg)
+	}
+
+	if singleArgValue != "" {
+		return convertValue(singleArgValue, arg)
+	}
+
+	return reflect.Value{}, fmt.Errorf("unable to parse arg%d for %s", arg.Index, arg.Type)
+}
+
+func convertValue(singleArgValue string, arg argIn) (reflect.Value, error) {
+	v, err := dealDirectParamArg(singleArgValue, arg.Kind)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+
+	return convertPtr(arg.Ptr, reflect.ValueOf(v)), nil
+}
+
+func parseArgIns(ft reflect.Type) []argIn {
+	numIn := ft.NumIn()
+	argIns := make([]argIn, numIn)
+
+	for i := 0; i < numIn; i++ {
+		argIns[i] = parseArgs(ft, i)
+	}
+
+	return argIns
+}
+
+func createArgValues(c *gin.Context, argTags map[int][]reflect.StructTag) map[int]string {
 	args := map[int]string{}
 
-	for _, tags := range argTags {
-		for _, tag := range tags {
-			if arg := tag.Get("arg"); arg != "" {
-				for _, argItem := range strings.Split(arg, "/") {
-					a.parseTags(c, argItem, args)
-				}
-			}
+	collectTagValues(argTags, "arg", func(v string) bool {
+		for _, argItem := range strings.Split(v, "/") {
+			parseTags(c, argItem, args)
 		}
-	}
+
+		return false
+	})
 
 	return args
 }
 
-func (a *Adaptor) parseTags(c *gin.Context, arg string, args map[int]string) {
+func collectTagValues(argTags map[int][]reflect.StructTag, tagName string, fn func(string) bool) {
+	for _, tags := range argTags {
+		for _, tag := range tags {
+			if v := tag.Get(tagName); v != "" {
+				if fn(v) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func parseTags(c *gin.Context, arg string, args map[int]string) {
 	parts := strings.Split(arg, ",")
 	namesStr, mode := parts[0], parts[1]
 
@@ -389,16 +475,15 @@ func (a *Adaptor) parseTags(c *gin.Context, arg string, args map[int]string) {
 	}
 }
 
-func (a *Adaptor) findTags(ft reflect.Type) map[int][]reflect.StructTag {
+func collectTags(args []argIn) map[int][]reflect.StructTag {
 	argTags := make(map[int][]reflect.StructTag)
 
-	for i := 0; i < ft.NumIn(); i++ {
-		argType, argKind, _ := parseArgs(ft, i)
-		if argKind != reflect.Struct {
+	for i, arg := range args {
+		if arg.Kind != reflect.Struct {
 			continue
 		}
 
-		if tags := findTags(argType, _TType); len(tags) > 0 {
+		if tags := findTags(arg.Type, _TType); len(tags) > 0 {
 			argTags[i] = tags
 		}
 	}
@@ -430,28 +515,34 @@ func dealDirectParamArg(argValue string, argKind reflect.Kind) (interface{}, err
 	return nil, fmt.Errorf("unsupported type %v", argKind)
 }
 
-func parseArgs(ft reflect.Type, argIndex int) (reflect.Type, reflect.Kind, bool) {
+func parseArgs(ft reflect.Type, argIndex int) argIn {
 	argType := ft.In(argIndex)
-	isArgTypePtr := argType.Kind() == reflect.Ptr
+	ptr := argType.Kind() == reflect.Ptr
 
-	if isArgTypePtr {
+	if ptr {
 		argType = argType.Elem()
 	}
 
-	return argType, argType.Kind(), isArgTypePtr
+	return argIn{
+		Index:          argIndex,
+		Type:           argType,
+		Kind:           argType.Kind(),
+		Ptr:            ptr,
+		PrimitiveIndex: -1,
+	}
 }
 
-func (a *Adaptor) processStruct(c *gin.Context, argType reflect.Type, isArgTypePtr bool) (reflect.Value, error) {
-	if isArgTypePtr && argType == GetNonPtrType(c) { // 直接注入gin.Context
+func (a *Adaptor) processStruct(c *gin.Context, arg argIn) (reflect.Value, error) {
+	if arg.Ptr && arg.Type == GetNonPtrType(c) { // 直接注入gin.Context
 		return reflect.ValueOf(c), nil
 	}
 
-	if v, exists := c.Get("_inject_" + argType.String()); exists {
-		return convertPtr(isArgTypePtr, v.(reflect.Value)), nil
+	if v, exists := c.Get("_inject_" + arg.Type.String()); exists {
+		return convertPtr(arg.Ptr, v.(reflect.Value)), nil
 	}
 
-	if tp := a.findTypeProcessor(argType); tp != nil {
-		v, err := tp(c, argType)
+	if tp := a.findTypeProcessor(arg.Type); tp != nil {
+		v, err := tp(c, arg.Type)
 		if err != nil {
 			return reflect.Value{}, err
 		}
@@ -459,7 +550,7 @@ func (a *Adaptor) processStruct(c *gin.Context, argType reflect.Type, isArgTypeP
 		return reflect.ValueOf(v), nil
 	}
 
-	argValue := reflect.New(argType)
+	argValue := reflect.New(arg.Type)
 	if err := c.ShouldBind(argValue.Interface()); err != nil {
 		return reflect.Value{}, err
 	}
@@ -564,6 +655,8 @@ type IRoutes interface {
 	PUT(string, HandlerFunc, ...OptionFn) IRoutes
 	OPTIONS(string, HandlerFunc, ...OptionFn) IRoutes
 	HEAD(string, HandlerFunc, ...OptionFn) IRoutes
+
+	HandleFn(HandlerFunc) IRoutes
 }
 
 // Route makes a route for Adaptor.
@@ -575,6 +668,45 @@ func (a *Adaptor) Route(r gin.IRoutes) IRoutes {
 type Routes struct {
 	GinRoutes gin.IRoutes
 	Adaptor   *Adaptor
+}
+
+// HandleFn will register h by its declaration.
+func (a *Routes) HandleFn(h HandlerFunc) IRoutes {
+	url := ""
+
+	argIns := parseArgIns(reflect.TypeOf(h))
+	collectTagValues(collectTags(argIns),
+		"url", func(v string) bool {
+			url = v
+			return true
+		})
+
+	url = strings.TrimSpace(url)
+	if url == "" {
+		panic("unable to find url")
+	}
+
+	urlFields := strings.Fields(url)
+
+	method := ""
+	relativePath := ""
+
+	switch m := strings.ToUpper(urlFields[0]); m {
+	case "ANY", "GET", "POST", "DELETE", "PATCH", "PUT", "OPTIONS", "HEAD": // nolint goconst
+		method = m
+		relativePath = urlFields[1]
+	default:
+		method = "ANY"
+		relativePath = urlFields[0]
+	}
+
+	if method != "ANY" {
+		a.GinRoutes.Handle(method, relativePath, a.Adaptor.Adapt(h))
+	} else {
+		a.GinRoutes.Any(relativePath, a.Adaptor.Adapt(h))
+	}
+
+	return a
 }
 
 // Use adds middleware, see example code.

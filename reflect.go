@@ -37,7 +37,7 @@ func IsEmptyValue(value reflect.Value) bool {
 // If v is a nil pointer, Indirect returns a zero Value.
 // If v is not a pointer, Indirect returns v.
 func IndirectAll(v reflect.Value) reflect.Value {
-	for v.Kind() == reflect.Ptr {
+	for v.Kind() == reflect.Ptr && v.Elem().IsValid() {
 		v = v.Elem()
 	}
 

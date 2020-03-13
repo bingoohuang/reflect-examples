@@ -116,12 +116,28 @@ func TestUMP(t *testing.T) {
 	gr.GET("/Get31/:name", f31)
 	gr.GET("/Get4", f4)
 
+	//gr.RegisterLogger("logrus", func(tagValue string) func(handlerName string,
+	//	handlerType reflect.Type, args, outs []reflect.Value) {
+	//	n := strings.Split(tagValue, ",")
+	//	scope, level := n[0], n[1]
+	//
+	//})
+	gr.HandleFn(f22)
+
 	assertResults(t, resp, c, r)
 }
 
 // f1 processes /Get1/:name/:age
 func f1(name string, age int) (Rsp, error) {
 	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
+}
+
+type f22Url struct {
+	giu.T `url:"GET /Get22/:id" logrus:"around,debug"`
+}
+
+func f22(id string, _ f22Url) string {
+	return "hello " + id
 }
 
 type projectID struct {
@@ -175,6 +191,7 @@ func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context
 	checkStatusOK(t, resp, c, r, "/Get1/bingoo/100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get2/bingoo/100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get21/bingoo", "hello bingoo")
+	checkStatusOK(t, resp, c, r, "/Get22/bingoo", "hello bingoo")
 	checkStatusOK(t, resp, c, r, "/Get3/bingoo?age=100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get31/bingoo?age=100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get4?name=bingoo&age=100", "bingoo:100")
