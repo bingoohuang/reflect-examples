@@ -104,9 +104,9 @@ func TestUMP(t *testing.T) {
 	gr.POST("/SetAge", func(req SetAgeReq) SetAgeRsp {
 		return SetAgeRsp{Name: fmt.Sprintf("%s:%d", req.Name, req.Age)}
 	})
-	gr.GET("/Get/:name/:age", func(name string, age int) (Rsp, error) {
-		return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
-	}, giu.Params(giu.URLParam("name"), giu.URLParam("age")))
+
+	gr.GET("/Get/:name/:age", f, giu.Params(giu.URLParam("name"), giu.URLParam("age")))
+	gr.GET("/Get2/:name/:age", f2)
 	gr.Any("/error", func() error { return errors.New("error occurred") })
 	gr.GET("/ok", func() error { return nil })
 	gr.GET("/url", func(c *gin.Context) string { return c.Request.URL.String() })
@@ -120,9 +120,20 @@ func TestUMP(t *testing.T) {
 	check(t, resp, c, r, "/error", 500, "error occurred")
 	checkStatusOK(t, resp, c, r, "/ok", "ok")
 	checkStatusOK(t, resp, c, r, "/Get/bingoo/100", "bingoo:100")
+	checkStatusOK(t, resp, c, r, "/Get2/bingoo/100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/url", "/url")
 	checkStatusOK(t, resp, c, r, "/MyObject1", "Test")
 	checkStatusOK(t, resp, c, r, "/MyObject2", "Test")
+}
+
+func f(name string, age int) (Rsp, error) {
+	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
+}
+
+func f2(name string, age int, _ *struct {
+	giu.T `arg:"name/age,url"`
+}) (Rsp, error) {
+	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 }
 
 func checkStatusOK(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine, url string, d interface{}) {

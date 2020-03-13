@@ -265,17 +265,23 @@ func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (
 
 	ii := -1
 	argVs := make([]reflect.Value, numIn)
+	argTags := a.findTags(ft)
 
 	for i := 0; i < numIn; i++ {
 		argType, argKind, isArgTypePtr := parseArgs(ft, i)
+
 		switch argKind {
 		case reflect.Struct:
-			v, err := a.processStruct(c, argType, isArgTypePtr)
-			if err != nil {
-				return nil, err
-			}
+			if _, isTagArg := argTags[i]; isTagArg {
+				argVs[i] = reflect.Zero(_TType)
+			} else {
+				v, err := a.processStruct(c, argType, isArgTypePtr)
+				if err != nil {
+					return nil, err
+				}
 
-			argVs[i] = convertPtr(isArgTypePtr, v)
+				argVs[i] = convertPtr(isArgTypePtr, v)
+			}
 		default:
 			ii++
 			v, err := dealDirectParamArg(c, option.Params[ii], argKind)
@@ -289,6 +295,35 @@ func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (
 	}
 
 	return argVs, nil
+}
+
+func (a *Adaptor) findTags(ft reflect.Type) map[int][]reflect.StructTag {
+	argTags := make(map[int][]reflect.StructTag)
+
+	for i := 0; i < ft.NumIn(); i++ {
+		argType, argKind, _ := parseArgs(ft, i)
+		if argKind != reflect.Struct {
+			continue
+		}
+
+		if tags := findTags(argType, _TType); len(tags) > 0 {
+			argTags[i] = tags
+		}
+	}
+
+	return argTags
+}
+
+func findTags(t reflect.Type, target reflect.Type) []reflect.StructTag {
+	tags := make([]reflect.StructTag, 0)
+	for i := 0; i < t.NumField(); i++ {
+		tf := t.Field(i)
+		if tf.Type == target {
+			tags = append(tags, tf.Tag)
+		}
+	}
+
+	return tags
 }
 
 func dealDirectParamArg(c *gin.Context, param Param, argKind reflect.Kind) (interface{}, error) {
@@ -462,3 +497,14 @@ func (a *Routes) Use(h HandlerFunc, optionFns ...OptionFn) IRoutes {
 }
 
 var _ IRoutes = (*Routes)(nil)
+
+// T defines the tag for handler functions.
+type T interface {
+	HandlerFnTag()
+}
+
+var (
+	// _TType defines the type of T.
+	// nolint gochecknoglobals
+	_TType = reflect.TypeOf((*T)(nil)).Elem()
+)
