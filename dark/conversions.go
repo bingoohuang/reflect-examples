@@ -4,7 +4,7 @@ import (
 	"unsafe"
 )
 
-// Stringer transforms a slice of byte into a string without doing the actual copy
+// String transforms a slice of byte into a string without doing the actual copy
 // of the data.
 func String(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))

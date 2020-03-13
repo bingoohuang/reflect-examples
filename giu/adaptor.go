@@ -6,12 +6,15 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/bingoohuang/goreflect"
+	"github.com/bingoohuang/gor"
 	"github.com/gin-gonic/gin"
 )
 
 // TypeProcessor is the processor for a specified type.
 type TypeProcessor func(*gin.Context, ...interface{}) (interface{}, error)
+
+// Processor is the processor for a specified type.
+type Processor func(*gin.Context, ...interface{})
 
 // Adaptor is the adaptor structure for gin.HandlerFunc.
 type Adaptor struct {
@@ -25,6 +28,22 @@ func NewAdaptor() *Adaptor {
 	}
 }
 
+// RegisterErrProcessor register a type processor for the error.
+func (a *Adaptor) RegisterErrProcessor(p Processor) {
+	a.register[gor.ErrType] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
+		p(c, args...)
+		return nil, nil
+	}
+}
+
+// RegisterSuccProcessor register a type processor for the successful deal.
+func (a *Adaptor) RegisterSuccProcessor(p Processor) {
+	a.register[GetNonPtrType(SuccInvokedType)] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
+		p(c, args...)
+		return nil, nil
+	}
+}
+
 // RegisterTypeProcessor register a type processor for the type.
 func (a *Adaptor) RegisterTypeProcessor(t interface{}, p TypeProcessor) {
 	a.register[GetNonPtrType(t)] = p
@@ -32,7 +51,7 @@ func (a *Adaptor) RegisterTypeProcessor(t interface{}, p TypeProcessor) {
 
 func (a *Adaptor) findTypeProcessor(t reflect.Type) TypeProcessor {
 	for k, v := range a.register {
-		if goreflect.ImplType(t, k) {
+		if gor.ImplType(t, k) {
 			return v
 		}
 	}
@@ -49,15 +68,15 @@ func (a *Adaptor) findTypeProcessorOr(t reflect.Type, defaultProcessor TypeProce
 	return defaultProcessor
 }
 
-// SuccessfullyInvoked represents the adaptor is invoked successfully with returned value.
-type SuccessfullyInvoked interface {
+// SuccInvoked represents the adaptor is invoked successfully with returned value.
+type SuccInvoked interface {
 	SuccessfullyInvoked()
 }
 
 var (
-	// SuccessfullyInvokedType defines the successfully adaptor invoke's type.
+	// SuccInvokedType defines the successfully adaptor invoke's type.
 	// nolint gochecknoglobals
-	SuccessfullyInvokedType = reflect.TypeOf((*SuccessfullyInvoked)(nil)).Elem()
+	SuccInvokedType = reflect.TypeOf((*SuccInvoked)(nil)).Elem()
 )
 
 // GetNonPtrType returns the non-ptr type of v.
@@ -88,7 +107,12 @@ type StateCodeError interface {
 
 func defaultSuccessProcessor(g *gin.Context, vs ...interface{}) (interface{}, error) {
 	if len(vs) > 0 {
-		g.JSON(http.StatusOK, vs[0])
+		v0 := vs[0]
+		if reflect.Indirect(reflect.ValueOf(v0)).Kind() == reflect.Struct {
+			g.JSON(http.StatusOK, v0)
+		} else {
+			g.String(http.StatusOK, fmt.Sprintf("%v", v0))
+		}
 	}
 
 	return nil, nil
@@ -170,7 +194,7 @@ func (a *Adaptor) Adapt(fn HandlerFunc, optionFns ...OptionFn) gin.HandlerFunc {
 	}
 
 	fv := reflect.ValueOf(fn)
-	errTp := a.findTypeProcessorOr(goreflect.ErrType, defaultErrorProcessor)
+	errTp := a.findTypeProcessorOr(gor.ErrType, defaultErrorProcessor)
 
 	return func(c *gin.Context) {
 		argVs, err := a.createArgs(c, fv, option)
@@ -196,7 +220,7 @@ func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value
 		return nil
 	}
 
-	if goreflect.AsError(ft.Out(numOut - 1)) { // nolint gomnd
+	if gor.AsError(ft.Out(numOut - 1)) { // nolint gomnd
 		if !r[numOut-1].IsNil() {
 			return r[numOut-1].Interface().(error)
 		}
@@ -216,7 +240,7 @@ func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value
 		return nil
 	}
 
-	p := a.findTypeProcessorOr(SuccessfullyInvokedType, defaultSuccessProcessor)
+	p := a.findTypeProcessorOr(SuccInvokedType, defaultSuccessProcessor)
 	_, _ = p(c, vs...)
 
 	return nil

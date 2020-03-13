@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/bingoohuang/goreflect/sudo"
+	"github.com/bingoohuang/gor/sudo"
 )
 
 func ExampleSudo() {

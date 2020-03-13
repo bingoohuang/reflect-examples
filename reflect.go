@@ -1,4 +1,4 @@
-package goreflect
+package gor
 
 import (
 	"reflect"
@@ -73,3 +73,13 @@ func IsError(t reflect.Type) bool { return t == ErrType }
 
 // AsError tells t whether it implements error type exactly.
 func AsError(t reflect.Type) bool { return ImplType(t, ErrType) }
+
+// V returns the variadic arguments to slice.
+func V(v ...interface{}) []interface{} {
+	return v
+}
+
+// V0 returns the one of variadic arguments at index 0.
+func V0(v ...interface{}) interface{} {
+	return v[0]
+}

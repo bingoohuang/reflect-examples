@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bingoohuang/goreflect/defaults/internal/fixture"
+	"github.com/bingoohuang/gor/defaults/internal/fixture"
 )
 
 type (

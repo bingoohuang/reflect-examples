@@ -386,7 +386,7 @@ func TestField_Fields(t *testing.T) {
 func TestField_FieldOk(t *testing.T) {
 	s := newStruct()
 
-	b, ok := s.FieldOk("Bar")
+	b, ok := s.FieldOK("Bar")
 	if !ok {
 		t.Error("The field 'Bar' should exists.")
 	}

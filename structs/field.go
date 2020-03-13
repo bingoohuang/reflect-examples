@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/bingoohuang/goreflect"
+	"github.com/bingoohuang/gor"
 )
 
 var (
+	// ErrNotExported defines the error for not exported.
 	ErrNotExported = errors.New("field is not exported")
+	// ErrNotSettable defines the error for not settable.
 	ErrNotSettable = errors.New("field is not settable")
 )
 
@@ -37,7 +39,7 @@ func (f *Field) IsExported() bool { return f.field.PkgPath == "" }
 
 // IsZero returns true if the given field is not initialized (has a zero value).
 // It panics if the field is not exported.
-func (f *Field) IsZero() bool { return goreflect.IsEmptyValue(f.value) }
+func (f *Field) IsZero() bool { return gor.IsEmptyValue(f.value) }
 
 // Name returns the name of the given field
 func (f *Field) Name() string { return f.field.Name }

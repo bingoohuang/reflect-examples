@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/bingoohuang/goreflect/dark"
+	"github.com/bingoohuang/gor/dark"
 )
 
 func TestDeepCopy(t *testing.T) {

@@ -4,7 +4,7 @@ package structs
 import (
 	"fmt"
 
-	"github.com/bingoohuang/goreflect"
+	"github.com/bingoohuang/gor"
 
 	"reflect"
 )
@@ -147,7 +147,7 @@ func (s *Struct) FillMap(out map[string]interface{}) {
 
 		// if the value is a zero value and the field is marked as omitempty do
 		// not include
-		if tagOpts.OmitEmpty() && goreflect.IsEmptyValue(val) {
+		if tagOpts.OmitEmpty() && gor.IsEmptyValue(val) {
 			continue
 		}
 
@@ -219,7 +219,7 @@ func (s *Struct) Values() []interface{} {
 		_, tagOpts := parseTag(s.Option, field.Tag.Get(s.Option.TagName))
 
 		// if the value is a zero value and the field is marked as omitempty do not include
-		if tagOpts.OmitEmpty() && goreflect.IsEmptyValue(val) {
+		if tagOpts.OmitEmpty() && gor.IsEmptyValue(val) {
 			continue
 		}
 
@@ -306,7 +306,7 @@ func getFields(v reflect.Value, tagName string) []*Field {
 // Field returns a new Field struct that provides several high level functions
 // around a single struct field entity. It panics if the field is not found.
 func (s *Struct) Field(name string) *Field {
-	f, ok := s.FieldOk(name)
+	f, ok := s.FieldOK(name)
 	if !ok {
 		panic("field not found")
 	}
@@ -315,9 +315,8 @@ func (s *Struct) Field(name string) *Field {
 }
 
 // FieldOK returns a new Field struct that provides several high level functions
-// around a single struct field entity. The boolean returns true if the field
-// was found.
-func (s *Struct) FieldOk(name string) (*Field, bool) {
+// around a single struct field entity. The boolean returns true if the field was found.
+func (s *Struct) FieldOK(name string) (*Field, bool) {
 	t := s.value.Type()
 
 	field, ok := t.FieldByName(name)
@@ -458,7 +457,7 @@ func (s *Struct) structFields() []reflect.StructField {
 }
 
 func strctVal(s interface{}) reflect.Value {
-	v := goreflect.IndirectAll(reflect.ValueOf(s))
+	v := gor.IndirectAll(reflect.ValueOf(s))
 
 	if v.Kind() != reflect.Struct {
 		panic("not struct")
@@ -605,7 +604,7 @@ func (s *Struct) dealMapValue(val reflect.Value) interface{} {
 }
 
 func (s *Struct) dealStructValue(val reflect.Value) interface{} {
-	if goreflect.AsError(val.Type()) {
+	if gor.AsError(val.Type()) {
 		return val.Interface().(error).Error()
 	}
 

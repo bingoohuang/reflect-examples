@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/bingoohuang/goreflect/defaults"
+	"github.com/bingoohuang/gor/defaults"
 )
 
 // Validator is an interface for a validated struct.

@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/bingoohuang/goreflect/sudo"
+	"github.com/bingoohuang/gor/sudo"
 )
 
 func TestSudo(t *testing.T) {

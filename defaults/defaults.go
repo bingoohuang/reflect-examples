@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bingoohuang/goreflect"
+	"github.com/bingoohuang/gor"
 )
 
 // ErrInvalidType is the error for non-struct pointer
@@ -348,7 +348,7 @@ func convertStruct(t reflect.Type, v string) (reflect.Value, error) {
 }
 
 func hasInitialValue(field reflect.Value) bool {
-	return goreflect.IsEmptyValue(field)
+	return gor.IsEmptyValue(field)
 }
 
 func shouldInitializeField(field reflect.Value, defaultVal string) bool {

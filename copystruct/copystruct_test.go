@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bingoohuang/goreflect/copystruct"
+	"github.com/bingoohuang/gor/copystruct"
 
 	"github.com/guregu/null"
 	"github.com/lib/pq"

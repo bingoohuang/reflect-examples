@@ -1,4 +1,4 @@
-module github.com/bingoohuang/goreflect
+module github.com/bingoohuang/gor
 
 go 1.12
 

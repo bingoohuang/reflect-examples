@@ -1,4 +1,4 @@
-package goreflect
+package gor
 
 import (
 	"fmt"

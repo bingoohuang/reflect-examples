@@ -1,6 +1,6 @@
-// Package goreflect ...
+// Package gor ...
 // nolint gomnd
-package goreflect
+package gor
 
 import (
 	"fmt"

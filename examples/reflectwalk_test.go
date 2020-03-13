@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/bingoohuang/goreflect/walk"
+	"github.com/bingoohuang/gor/walk"
 	"github.com/stretchr/testify/assert"
 )
 
