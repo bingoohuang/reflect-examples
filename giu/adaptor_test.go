@@ -183,6 +183,7 @@ func TestHello(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+// from https://github.com/gin-gonic/gin/issues/1120
 func performRequest(method, target string, router *gin.Engine) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(method, target, nil)
 	w := httptest.NewRecorder()
