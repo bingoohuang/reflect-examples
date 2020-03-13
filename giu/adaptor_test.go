@@ -111,6 +111,7 @@ func TestUMP(t *testing.T) {
 
 	gr.GET("/Get1/:name/:age", f1, giu.Params(giu.URLParams("name", "age")))
 	gr.GET("/Get2/:name/:age", f2)
+	gr.GET("/Get21/:id", f21)
 	gr.GET("/Get3/:name", f3)
 	gr.GET("/Get31/:name", f31)
 	gr.GET("/Get4", f4)
@@ -121,6 +122,16 @@ func TestUMP(t *testing.T) {
 // f1 processes /Get1/:name/:age
 func f1(name string, age int) (Rsp, error) {
 	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
+}
+
+type projectID struct {
+	giu.T `arg:"id,url"`
+}
+
+// f21 processes /Get21/:id
+// gr.GET("/Get21/:id", f21)
+func f21(id string, _ projectID) string {
+	return "hello " + id
 }
 
 // f2 processes /Get2/:name/:age
@@ -163,6 +174,7 @@ func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context
 	checkStatusOK(t, resp, c, r, "/ok", "ok")
 	checkStatusOK(t, resp, c, r, "/Get1/bingoo/100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get2/bingoo/100", "bingoo:100")
+	checkStatusOK(t, resp, c, r, "/Get21/bingoo", "hello bingoo")
 	checkStatusOK(t, resp, c, r, "/Get3/bingoo?age=100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get31/bingoo?age=100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get4?name=bingoo&age=100", "bingoo:100")
