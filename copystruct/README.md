@@ -69,7 +69,7 @@ package main
 import (
     "fmt"
  
-    "github.com/bingoohuang/goreflect/copystruct"
+    "github.com/bingoohuang/gor/copystruct"
 )
 
 // Model
