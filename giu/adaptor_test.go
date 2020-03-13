@@ -105,12 +105,46 @@ func TestUMP(t *testing.T) {
 		return SetAgeRsp{Name: fmt.Sprintf("%s:%d", req.Name, req.Age)}
 	})
 
-	gr.GET("/Get/:name/:age", f, giu.Params(giu.URLParam("name"), giu.URLParam("age")))
-	gr.GET("/Get2/:name/:age", f2)
 	gr.Any("/error", func() error { return errors.New("error occurred") })
 	gr.GET("/ok", func() error { return nil })
 	gr.GET("/url", func(c *gin.Context) string { return c.Request.URL.String() })
 
+	gr.GET("/Get1/:name/:age", f1, giu.Params(giu.URLParam("name"), giu.URLParam("age")))
+	gr.GET("/Get2/:name/:age", f2)
+	gr.GET("/Get3/:name", f3)
+	gr.GET("/Get4", f4)
+
+	assertResults(t, resp, c, r)
+}
+
+// f1 processes /Get1/:name/:age
+func f1(name string, age int) (Rsp, error) {
+	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
+}
+
+// f2 processes /Get2/:name/:age
+func f2(name string, age int, _ struct {
+	giu.T `arg:"name age,url"` // name和age都是url变量，通过gin.Context.Param(x)获取
+}) (Rsp, error) {
+	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
+}
+
+// f3 processes  /Get3/:name?age=100
+func f3(name string, age int, _ struct {
+	N giu.T `arg:"name,url"`  // name是url变量，通过gin.Context.Param(x)获取
+	A giu.T `arg:"age,query"` // age是query变量，通过gin.Context.Query(x)获取
+}) (Rsp, error) {
+	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
+}
+
+// f4 processes /Get4?name=bingoo&&age=100
+func f4(name string, age int, _ struct {
+	giu.T `arg:"name age,query"` // name和age都是query变量，通过gin.Context.Query(x)获取
+}) (Rsp, error) {
+	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
+}
+
+func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine) {
 	checkStatusOK(t, resp, c, r, "/GetAge1/bingoo", "TestAuthUser/bingoo")
 	checkStatusOK(t, resp, c, r, "/GetAge2/bingoo", "TestAuthUser/bingoo")
 	checkStatusOK(t, resp, c, r, "/GetAge3/bingoo", "TestAuthUser/bingoo")
@@ -119,21 +153,13 @@ func TestUMP(t *testing.T) {
 		SetAgeReq{Name: "bingoo", Age: 100}, SetAgeRsp{Name: "bingoo:100"})
 	check(t, resp, c, r, "/error", 500, "error occurred")
 	checkStatusOK(t, resp, c, r, "/ok", "ok")
-	checkStatusOK(t, resp, c, r, "/Get/bingoo/100", "bingoo:100")
+	checkStatusOK(t, resp, c, r, "/Get1/bingoo/100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get2/bingoo/100", "bingoo:100")
+	checkStatusOK(t, resp, c, r, "/Get3/bingoo?age=100", "bingoo:100")
+	checkStatusOK(t, resp, c, r, "/Get4?name=bingoo&&age=100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/url", "/url")
 	checkStatusOK(t, resp, c, r, "/MyObject1", "Test")
 	checkStatusOK(t, resp, c, r, "/MyObject2", "Test")
-}
-
-func f(name string, age int) (Rsp, error) {
-	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
-}
-
-func f2(name string, age int, _ *struct {
-	giu.T `arg:"name/age,url"`
-}) (Rsp, error) {
-	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 }
 
 func checkStatusOK(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine, url string, d interface{}) {

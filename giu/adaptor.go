@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/bingoohuang/gor"
 	"github.com/gin-gonic/gin"
@@ -266,26 +267,33 @@ func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (
 	ii := -1
 	argVs := make([]reflect.Value, numIn)
 	argTags := a.findTags(ft)
+	args := a.createArgValues(c, argTags)
 
 	for i := 0; i < numIn; i++ {
 		argType, argKind, isArgTypePtr := parseArgs(ft, i)
 
+		if _, isTagArg := argTags[i]; isTagArg {
+			argVs[i] = convertPtr(isArgTypePtr, reflect.New(argType))
+			continue
+		}
+
 		switch argKind {
 		case reflect.Struct:
-			if _, isTagArg := argTags[i]; isTagArg {
-				argVs[i] = reflect.Zero(_TType)
-			} else {
-				v, err := a.processStruct(c, argType, isArgTypePtr)
-				if err != nil {
-					return nil, err
-				}
-
-				argVs[i] = convertPtr(isArgTypePtr, v)
+			v, err := a.processStruct(c, argType, isArgTypePtr)
+			if err != nil {
+				return nil, err
 			}
+
+			argVs[i] = convertPtr(isArgTypePtr, v)
 		default:
 			ii++
-			v, err := dealDirectParamArg(c, option.Params[ii], argKind)
+			argII, ok := args[ii]
 
+			if !ok && ii < len(option.Params) {
+				argII = option.Params[ii].Get(c)
+			}
+
+			v, err := dealDirectParamArg(argII, argKind)
 			if err != nil {
 				return nil, err
 			}
@@ -295,6 +303,38 @@ func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (
 	}
 
 	return argVs, nil
+}
+
+func (a *Adaptor) createArgValues(c *gin.Context, argTags map[int][]reflect.StructTag) map[int]string {
+	args := map[int]string{}
+
+	for _, tags := range argTags {
+		for _, tag := range tags {
+			if arg := tag.Get("arg"); arg != "" {
+				a.parseTags(c, arg, args)
+			}
+		}
+	}
+
+	return args
+}
+
+func (a *Adaptor) parseTags(c *gin.Context, arg string, args map[int]string) {
+	parts := strings.Split(arg, ",")
+	namesStr, mode := parts[0], parts[1]
+
+	for _, name := range strings.Fields(namesStr) {
+		switch mode {
+		case "url":
+			args[len(args)] = c.Param(name)
+		case "query":
+			args[len(args)] = c.Query(name)
+		case "form":
+			args[len(args)], _ = c.GetPostForm(name)
+		case "context":
+			args[len(args)] = c.GetString(name)
+		}
+	}
 }
 
 func (a *Adaptor) findTags(ft reflect.Type) map[int][]reflect.StructTag {
@@ -316,6 +356,7 @@ func (a *Adaptor) findTags(ft reflect.Type) map[int][]reflect.StructTag {
 
 func findTags(t reflect.Type, target reflect.Type) []reflect.StructTag {
 	tags := make([]reflect.StructTag, 0)
+
 	for i := 0; i < t.NumField(); i++ {
 		tf := t.Field(i)
 		if tf.Type == target {
@@ -326,9 +367,7 @@ func findTags(t reflect.Type, target reflect.Type) []reflect.StructTag {
 	return tags
 }
 
-func dealDirectParamArg(c *gin.Context, param Param, argKind reflect.Kind) (interface{}, error) {
-	argValue := param.Get(c)
-
+func dealDirectParamArg(argValue string, argKind reflect.Kind) (interface{}, error) {
 	switch argKind {
 	case reflect.String:
 		return argValue, nil
