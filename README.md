@@ -73,4 +73,5 @@ The awesome gopher in the logo was taken from [@egonelbre/gophers](https://githu
 1. [Copier for golang, copy value from struct to struct and more](https://github.com/jinzhu/copier)
 1. [DeepCopy makes deep copies of things: unexported field values are not copied](https://github.com/mohae/deepcopy)
 1. [Golang package for editing struct's fields during runtime and mapping structs to other structs.](https://github.com/Ompluscator/dynamic-struct)
+1. [monkey.Patch(<target function>, <replacement function>) to replace a function.](https://github.com/bouk/monkey)
 
