@@ -122,7 +122,7 @@ func TestUMP(t *testing.T) {
 	//	scope, level := n[0], n[1]
 	//
 	//})
-	gr.HandleFn(f22)
+	gr.HandleFn(f22, f{})
 
 	assertResults(t, resp, c, r)
 }
@@ -136,9 +136,21 @@ type f22Url struct {
 	giu.T `url:"GET /Get22/:id" logrus:"around,debug"`
 }
 
-func f22(id string, _ f22Url) string {
-	return "hello " + id
+func f22(id string, _ f22Url) string { return "hello " + id }
+
+type f struct{}
+
+type f23Url struct {
+	giu.T `url:"GET /Get23/:id" logrus:"around,debug"`
 }
+
+func (f) F23(id string, _ f23Url) string { return "hello f23 " + id }
+
+type f24Url struct {
+	giu.T `url:"GET /Get24/:id" logrus:"around,debug"`
+}
+
+func (f) F24(id string, _ f24Url) string { return "hello f24 " + id }
 
 type projectID struct {
 	giu.T `arg:"id,url"`
@@ -146,9 +158,7 @@ type projectID struct {
 
 // f21 processes /Get21/:id
 // gr.GET("/Get21/:id", f21)
-func f21(id string, _ projectID) string {
-	return "hello " + id
-}
+func f21(id string, _ projectID) string { return "hello " + id }
 
 // f2 processes /Get2/:name/:age
 func f2(name string, age int, _ struct {
@@ -192,6 +202,8 @@ func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context
 	checkStatusOK(t, resp, c, r, "/Get2/bingoo/100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get21/bingoo", "hello bingoo")
 	checkStatusOK(t, resp, c, r, "/Get22/bingoo", "hello bingoo")
+	checkStatusOK(t, resp, c, r, "/Get23/bingoo", "hello f23 bingoo")
+	checkStatusOK(t, resp, c, r, "/Get24/bingoo", "hello f24 bingoo")
 	checkStatusOK(t, resp, c, r, "/Get3/bingoo?age=100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get31/bingoo?age=100", "bingoo:100")
 	checkStatusOK(t, resp, c, r, "/Get4?name=bingoo&age=100", "bingoo:100")

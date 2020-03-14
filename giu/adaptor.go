@@ -324,7 +324,6 @@ type argIn struct {
 func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (v []reflect.Value, err error) {
 	ft := fv.Type()
 	numIn := ft.NumIn()
-
 	argIns := parseArgIns(ft)
 	argAsTags := collectTags(argIns)
 	argValuesByTag := createArgValues(c, argAsTags)
@@ -656,7 +655,7 @@ type IRoutes interface {
 	OPTIONS(string, HandlerFunc, ...OptionFn) IRoutes
 	HEAD(string, HandlerFunc, ...OptionFn) IRoutes
 
-	HandleFn(HandlerFunc) IRoutes
+	HandleFn(...HandlerFunc) IRoutes
 }
 
 // Route makes a route for Adaptor.
@@ -671,18 +670,44 @@ type Routes struct {
 }
 
 // HandleFn will register h by its declaration.
-func (a *Routes) HandleFn(h HandlerFunc) IRoutes {
+func (a *Routes) HandleFn(hs ...HandlerFunc) IRoutes {
+	for _, h := range hs {
+		ht := reflect.TypeOf(h)
+		if ht.Kind() == reflect.Func {
+			a.handleFn(h, false)
+			continue
+		}
+
+		if ht.Kind() == reflect.Ptr {
+			ht = ht.Elem()
+		}
+
+		if ht.Kind() == reflect.Interface {
+			panic(fmt.Errorf("invalid handler type %v for %v", ht, h))
+		}
+
+		v := reflect.ValueOf(h)
+
+		for i := 0; i < ht.NumMethod(); i++ {
+			a.handleFn(v.Method(i).Interface(), true)
+		}
+	}
+
+	return a
+}
+
+func (a *Routes) handleFn(h HandlerFunc, ingoreIllegal bool) {
 	url := ""
 
 	argIns := parseArgIns(reflect.TypeOf(h))
-	collectTagValues(collectTags(argIns),
-		"url", func(v string) bool {
-			url = v
-			return true
-		})
+	collectTagValues(collectTags(argIns), "url", func(v string) bool { url = v; return true })
 
 	url = strings.TrimSpace(url)
 	if url == "" {
+		if ingoreIllegal {
+			return
+		}
+
 		panic("unable to find url")
 	}
 
@@ -705,8 +730,6 @@ func (a *Routes) HandleFn(h HandlerFunc) IRoutes {
 	} else {
 		a.GinRoutes.Any(relativePath, a.Adaptor.Adapt(h))
 	}
-
-	return a
 }
 
 // Use adds middleware, see example code.
@@ -722,9 +745,7 @@ func (a *Routes) Use(h HandlerFunc, optionFns ...OptionFn) IRoutes {
 var _ IRoutes = (*Routes)(nil)
 
 // T defines the tag for handler functions.
-type T interface {
-	HandlerFnTag()
-}
+type T interface{ t() }
 
 var (
 	// _TType defines the type of T.
