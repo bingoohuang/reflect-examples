@@ -2,7 +2,6 @@ package giu
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -20,39 +19,47 @@ type Processor func(*gin.Context, ...interface{})
 
 // Adaptor is the adaptor structure for gin.HandlerFunc.
 type Adaptor struct {
-	register map[reflect.Type]TypeProcessor
+	typeProcessors    map[reflect.Type]TypeProcessor
+	arounderFactories map[string]InvokeArounderFactory
+	arounders         map[reflect.Type]InvokeArounder
 }
 
 // NewAdaptor makes a new Adaptor.
 func NewAdaptor() *Adaptor {
 	return &Adaptor{
-		register: make(map[reflect.Type]TypeProcessor),
+		typeProcessors:    make(map[reflect.Type]TypeProcessor),
+		arounderFactories: make(map[string]InvokeArounderFactory),
+		arounders:         make(map[reflect.Type]InvokeArounder),
 	}
 }
 
-// RegisterErrProcessor register a type processor for the error.
+func (a *Adaptor) RegisterInvokeArounder(arounderName string, arounder InvokeArounderFactory) {
+	a.arounderFactories[arounderName] = arounder
+}
+
+// RegisterErrProcessor typeProcessors a type processor for the error.
 func (a *Adaptor) RegisterErrProcessor(p Processor) {
-	a.register[gor.ErrType] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
+	a.typeProcessors[gor.ErrType] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
 		p(c, args...)
 		return nil, nil
 	}
 }
 
-// RegisterSuccProcessor register a type processor for the successful deal.
+// RegisterSuccProcessor typeProcessors a type processor for the successful deal.
 func (a *Adaptor) RegisterSuccProcessor(p Processor) {
-	a.register[GetNonPtrType(SuccInvokedType)] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
+	a.typeProcessors[GetNonPtrType(SuccInvokedType)] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
 		p(c, args...)
 		return nil, nil
 	}
 }
 
-// RegisterTypeProcessor register a type processor for the type.
+// RegisterTypeProcessor typeProcessors a type processor for the type.
 func (a *Adaptor) RegisterTypeProcessor(t interface{}, p TypeProcessor) {
-	a.register[GetNonPtrType(t)] = p
+	a.typeProcessors[GetNonPtrType(t)] = p
 }
 
 func (a *Adaptor) findTypeProcessor(t reflect.Type) TypeProcessor {
-	for k, v := range a.register {
+	for k, v := range a.typeProcessors {
 		if gor.ImplType(t, k) {
 			return v
 		}
@@ -246,6 +253,7 @@ func (a *Adaptor) Adapt(fn HandlerFunc, optionFns ...OptionFn) gin.HandlerFunc {
 	}
 
 	fv := reflect.ValueOf(fn)
+
 	errTp := a.findTypeProcessorOr(gor.ErrType, defaultErrorProcessor)
 
 	return func(c *gin.Context) {
@@ -256,14 +264,37 @@ func (a *Adaptor) Adapt(fn HandlerFunc, optionFns ...OptionFn) gin.HandlerFunc {
 			return
 		}
 
-		log.Printf("before call %v", fv.Type())
+		fa := a.arounders[fv.Type()]
+		if err := around(fa, argVs, true); err != nil {
+			_, _ = errTp(c, err)
+		}
+
 		r := fv.Call(argVs)
-		log.Printf("after call %v", fv.Type())
+
+		_ = around(fa, r, false)
 
 		if err := a.processOut(c, fv, r, option); err != nil {
 			_, _ = errTp(c, err)
 		}
 	}
+}
+
+func around(fa InvokeArounder, v []reflect.Value, before bool) error {
+	if fa == nil {
+		return nil
+	}
+
+	args := make([]interface{}, len(v))
+	for i, a := range v {
+		args[i] = a.Interface()
+	}
+
+	if before {
+		return fa.Before(args)
+	}
+
+	fa.After(args)
+	return nil
 }
 
 func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value, option *Option) error {
@@ -669,12 +700,12 @@ type Routes struct {
 	Adaptor   *Adaptor
 }
 
-// HandleFn will register h by its declaration.
+// HandleFn will typeProcessors h by its declaration.
 func (a *Routes) HandleFn(hs ...HandlerFunc) IRoutes {
 	for _, h := range hs {
 		ht := reflect.TypeOf(h)
 		if ht.Kind() == reflect.Func {
-			a.handleFn(h, false)
+			a.handleFn("", h, false)
 			continue
 		}
 
@@ -689,18 +720,29 @@ func (a *Routes) HandleFn(hs ...HandlerFunc) IRoutes {
 		v := reflect.ValueOf(h)
 
 		for i := 0; i < ht.NumMethod(); i++ {
-			a.handleFn(v.Method(i).Interface(), true)
+			a.handleFn(ht.Method(i).Name, v.Method(i).Interface(), true)
 		}
 	}
 
 	return a
 }
 
-func (a *Routes) handleFn(h HandlerFunc, ingoreIllegal bool) {
+func (a *Routes) handleFn(handlerName string, h HandlerFunc, ingoreIllegal bool) {
+	ht := reflect.TypeOf(h)
+	tags := collectTags(parseArgIns(ht))
+
+	for rounderName, factory := range a.Adaptor.arounderFactories {
+		f := factory
+
+		collectTagValues(tags, rounderName, func(v string) bool {
+			a.Adaptor.arounders[ht] = f.Create(handlerName, v, h)
+			return true
+		})
+	}
+
 	url := ""
 
-	argIns := parseArgIns(reflect.TypeOf(h))
-	collectTagValues(collectTags(argIns), "url", func(v string) bool { url = v; return true })
+	collectTagValues(tags, "url", func(v string) bool { url = v; return true })
 
 	url = strings.TrimSpace(url)
 	if url == "" {
@@ -752,3 +794,18 @@ var (
 	// nolint gochecknoglobals
 	_TType = reflect.TypeOf((*T)(nil)).Elem()
 )
+
+// InvokeArounderFactory defines the factory to create InvokeArounder
+type InvokeArounderFactory interface {
+	// Create creates the InvokeArounder with the tag value and the handler type.
+	Create(handlerName, tag string, handler HandlerFunc) InvokeArounder
+}
+
+// InvokeArounder defines the adaptee invoking before and after intercepting points for the user.
+type InvokeArounder interface {
+	// Before will be called before the adaptee invoking.
+	Before(args []interface{}) error
+
+	// After will be called after the adaptee invoking.
+	After(outs []interface{})
+}

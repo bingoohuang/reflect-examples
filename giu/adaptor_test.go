@@ -16,11 +16,13 @@ import (
 
 	"github.com/bingoohuang/gor/giu"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
 func init() {
 	gin.SetMode(gin.TestMode)
+	logrus.SetLevel(logrus.DebugLevel)
 }
 
 type Rsp struct {
@@ -116,16 +118,28 @@ func TestUMP(t *testing.T) {
 	gr.GET("/Get31/:name", f31)
 	gr.GET("/Get4", f4)
 
-	//gr.RegisterLogger("logrus", func(tagValue string) func(handlerName string,
-	//	handlerType reflect.Type, args, outs []reflect.Value) {
-	//	n := strings.Split(tagValue, ",")
-	//	scope, level := n[0], n[1]
-	//
-	//})
-	gr.HandleFn(f22, f{})
+	gr.HandleFn(f22)
+
+	ga.RegisterInvokeArounder("logrus", &MyInvokeArounderFactory{})
+
+	gr.HandleFn(f{})
 
 	assertResults(t, resp, c, r)
 }
+
+type f struct{}
+
+type f23Url struct {
+	giu.T `url:"GET /Get23/:id" logrus:"风起"`
+}
+
+func (f) Get23(id string, _ f23Url) string { return "hello f23 " + id }
+
+type f24Url struct {
+	giu.T `url:"GET /Get24/:id" logrus:"云涌"`
+}
+
+func (f) Get24(id string, _ f24Url) string { return "hello f24 " + id }
 
 // f1 processes /Get1/:name/:age
 func f1(name string, age int) (Rsp, error) {
@@ -133,24 +147,10 @@ func f1(name string, age int) (Rsp, error) {
 }
 
 type f22Url struct {
-	giu.T `url:"GET /Get22/:id" logrus:"around,debug"`
+	giu.T `url:"GET /Get22/:id" logrus:"明月"`
 }
 
 func f22(id string, _ f22Url) string { return "hello " + id }
-
-type f struct{}
-
-type f23Url struct {
-	giu.T `url:"GET /Get23/:id" logrus:"around,debug"`
-}
-
-func (f) F23(id string, _ f23Url) string { return "hello f23 " + id }
-
-type f24Url struct {
-	giu.T `url:"GET /Get24/:id" logrus:"around,debug"`
-}
-
-func (f) F24(id string, _ f24Url) string { return "hello f24 " + id }
 
 type projectID struct {
 	giu.T `arg:"id,url"`
@@ -276,4 +276,31 @@ func performRequest(method, target string, router *gin.Engine) *httptest.Respons
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 	return w
+}
+
+// InvokeArounderFactory defines the factory to create InvokeArounder
+type MyInvokeArounderFactory struct {
+}
+
+// Create creates the InvokeArounder with the tag value and the handler type.
+func (MyInvokeArounderFactory) Create(handlerName, tag string, handler giu.HandlerFunc) giu.InvokeArounder {
+	return &myInvokeArounder{handlerName: handlerName, Tag: tag, Handler: handler}
+}
+
+// myInvokeArounder defines the adaptee invoking before and after intercepting points for the user.
+type myInvokeArounder struct {
+	Tag         string
+	Handler     giu.HandlerFunc
+	handlerName string
+}
+
+// Before will be called before the adaptee invoking.
+func (a *myInvokeArounder) Before(args []interface{}) error {
+	logrus.Debugf("invoke %s before %s with args %v", a.handlerName, a.Tag, args)
+	return nil
+}
+
+// After will be called after the adaptee invoking.
+func (a *myInvokeArounder) After(outs []interface{}) {
+	logrus.Debugf("invoke %s after %s with outs %v", a.handlerName, a.Tag, outs)
 }
