@@ -72,6 +72,10 @@ func TestUMP(t *testing.T) {
 
 	ptrAuthUser := true
 	r.Use(func(c *gin.Context) {
+		if keep := ga.FindKeep(c); keep != nil {
+			logrus.Warnf("keep found %+v", keep)
+		}
+
 		if ptrAuthUser {
 			c.Set("AuthUser", &AuthUser{Name: "TestAuthUser"})
 		} else {
@@ -130,13 +134,13 @@ func TestUMP(t *testing.T) {
 type f struct{}
 
 type f23Url struct {
-	giu.T `url:"GET /Get23/:id" logrus:"风起"`
+	giu.T `url:"GET/POST /Get23/:id" logrus:"风起" keep:"ignore"`
 }
 
 func (f) Get23(id string, _ f23Url) string { return "hello f23 " + id }
 
 type f24Url struct {
-	giu.T `url:"GET /Get24/:id" logrus:"云涌"`
+	giu.T `url:"ANY /Get24/:id" logrus:"云涌"`
 }
 
 func (f) Get24(id string, _ f24Url) string { return "hello f24 " + id }
@@ -147,7 +151,7 @@ func f1(name string, age int) (Rsp, error) {
 }
 
 type f22Url struct {
-	giu.T `url:"GET /Get22/:id" logrus:"明月"`
+	giu.T `url:"/Get22/:id" logrus:"明月"`
 }
 
 func f22(id string, _ f22Url) string { return "hello " + id }

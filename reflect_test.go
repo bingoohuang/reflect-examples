@@ -41,7 +41,7 @@ func report(x interface{}) {
 
 	const format = "%-6s %-46s %s\n"
 
-	fmt.Printf(format, "Name", "Method expression", "Method value")
+	fmt.Printf(format, "Name", "Methods expression", "Methods value")
 
 	for i := 0; i < n; i++ {
 		if t.Kind() == reflect.Interface {

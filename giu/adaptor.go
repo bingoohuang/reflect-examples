@@ -3,12 +3,15 @@ package giu
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"path"
 	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/bingoohuang/gor"
 	"github.com/gin-gonic/gin"
+	"github.com/julienschmidt/httprouter"
 )
 
 // TypeProcessor is the processor for a specified type.
@@ -22,6 +25,7 @@ type Adaptor struct {
 	typeProcessors    map[reflect.Type]TypeProcessor
 	arounderFactories map[string]InvokeArounderFactory
 	arounders         map[reflect.Type]InvokeArounder
+	router            *httprouter.Router
 }
 
 // NewAdaptor makes a new Adaptor.
@@ -30,6 +34,7 @@ func NewAdaptor() *Adaptor {
 		typeProcessors:    make(map[reflect.Type]TypeProcessor),
 		arounderFactories: make(map[string]InvokeArounderFactory),
 		arounders:         make(map[reflect.Type]InvokeArounder),
+		router:            httprouter.New(),
 	}
 }
 
@@ -729,8 +734,58 @@ type IRoutes interface {
 }
 
 // Route makes a route for Adaptor.
-func (a *Adaptor) Route(r gin.IRouter) IRoutes {
-	return &Routes{GinRouter: r, Adaptor: a}
+func (a *Adaptor) Route(r gin.IRouter) IRoutes { return &Routes{GinRouter: r, Adaptor: a} }
+
+type Keep struct {
+	Path    string
+	Keep    string
+	Methods []string
+}
+
+type KeepResponseWriter struct {
+	http.ResponseWriter
+
+	keep *Keep
+}
+
+func (a *Adaptor) FindKeep(c *gin.Context) *Keep {
+	kw := &KeepResponseWriter{
+		ResponseWriter: httptest.NewRecorder(),
+	}
+
+	a.router.ServeHTTP(kw, c.Request)
+
+	return kw.keep
+}
+
+func (a *Adaptor) keep(methods []string, hasAny bool, absolutePath, keep string) {
+	f := func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		if kw, ok := w.(*KeepResponseWriter); ok {
+			kw.keep = &Keep{Path: absolutePath, Keep: keep, Methods: methods}
+		}
+	}
+
+	if hasAny {
+		a.any(absolutePath, f)
+	} else {
+		for _, m := range methods {
+			a.router.Handle(m, absolutePath, f)
+		}
+	}
+}
+
+// any registers a route that matches all the HTTP methods.
+// GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE, CONNECT, TRACE.
+func (a *Adaptor) any(relativePath string, handlers httprouter.Handle) {
+	a.router.Handle("GET", relativePath, handlers)
+	a.router.Handle("POST", relativePath, handlers)
+	a.router.Handle("PUT", relativePath, handlers)
+	a.router.Handle("PATCH", relativePath, handlers)
+	a.router.Handle("HEAD", relativePath, handlers)
+	a.router.Handle("OPTIONS", relativePath, handlers)
+	a.router.Handle("DELETE", relativePath, handlers)
+	a.router.Handle("CONNECT", relativePath, handlers)
+	a.router.Handle("TRACE", relativePath, handlers)
 }
 
 // Routes defines adaptor routes implemetation for IRoutes.
@@ -766,7 +821,7 @@ func (a *Routes) HandleFn(hs ...HandlerFunc) IRoutes {
 	return a
 }
 
-func (a *Routes) handleFn(handlerName string, h HandlerFunc, ingoreIllegal bool) {
+func (a *Routes) handleFn(handlerName string, h HandlerFunc, ignoreIllegal bool) {
 	ht := reflect.TypeOf(h)
 	tags := collectTags(parseArgIns(ht))
 
@@ -781,31 +836,92 @@ func (a *Routes) handleFn(handlerName string, h HandlerFunc, ingoreIllegal bool)
 	url, _ := getFirstTagValues(tags, "url")
 
 	if url = strings.TrimSpace(url); url == "" {
-		if ingoreIllegal {
+		if ignoreIllegal {
 			return
 		}
 
 		panic("unable to find url")
 	}
 
-	if method, relativePath := a.parseMethodRelativePath(url); method == anyMethod {
+	methods, hasAny, relativePath := a.parseMethodRelativePath(url)
+
+	if keep, _ := getFirstTagValues(tags, "keep"); keep != "" {
+		type basePather interface{ BasePath() string }
+
+		if bp, ok := a.GinRouter.(basePather); ok {
+			absolutePath := joinPaths(bp.BasePath(), relativePath)
+			a.Adaptor.keep(methods, hasAny, absolutePath, keep)
+		}
+	}
+
+	if hasAny {
 		a.GinRouter.Any(relativePath, a.Adaptor.Adapt(h))
 	} else {
-		a.GinRouter.Handle(method, relativePath, a.Adaptor.Adapt(h))
+		for _, method := range methods {
+			a.GinRouter.Handle(method, relativePath, a.Adaptor.Adapt(h))
+		}
 	}
+}
+
+// copied from github.com/gin-gonic/gin@v1.5.0/utils.go
+func joinPaths(absolutePath, relativePath string) string {
+	if relativePath == "" {
+		return absolutePath
+	}
+
+	finalPath := path.Join(absolutePath, relativePath)
+	appendSlash := lastChar(relativePath) == '/' && lastChar(finalPath) != '/'
+
+	if appendSlash {
+		return finalPath + "/"
+	}
+
+	return finalPath
+}
+
+func lastChar(str string) uint8 {
+	if str == "" {
+		panic("The length of the string can't be 0")
+	}
+
+	return str[len(str)-1]
 }
 
 const anyMethod = "ANY"
 
-func (a *Routes) parseMethodRelativePath(url string) (string, string) {
+func (a *Routes) parseMethodRelativePath(url string) ([]string, bool, string) {
 	urlFields := strings.Fields(url)
 
-	switch m := strings.ToUpper(urlFields[0]); m {
-	case anyMethod, "GET", "POST", "DELETE", "PATCH", "PUT", "OPTIONS", "HEAD": // nolint goconst
-		return m, urlFields[1]
-	default:
-		return anyMethod, urlFields[0]
+	// 没有定义HTTP METHOD，当做ANY
+	if len(urlFields) == 1 { // nolint gomnd
+		return []string{anyMethod}, true, urlFields[0]
 	}
+
+	allMethodsStr := strings.ToUpper(urlFields[0])
+	allMethods := strings.Split(allMethodsStr, "/")
+
+	methodMap := make(map[string]bool)
+	hasAny := false
+
+	for _, m := range allMethods {
+		if m == anyMethod {
+			hasAny = true
+			break
+		}
+
+		methodMap[m] = true
+	}
+
+	if hasAny {
+		return []string{anyMethod}, true, urlFields[1]
+	}
+
+	methods := make([]string, 0, len(methodMap))
+	for k := range methodMap {
+		methods = append(methods, k)
+	}
+
+	return methods, false, urlFields[1]
 }
 
 // Use adds middleware, see example code.
