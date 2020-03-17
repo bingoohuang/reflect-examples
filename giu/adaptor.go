@@ -115,14 +115,34 @@ type StateCodeError interface {
 	GetStateCode() int
 }
 
+// JSONValuer defines the interface of how to convert a JSON object.
+type JSONValuer interface {
+	// JSONValue converts the current object to an object.
+	JSONValue() (interface{}, error)
+}
+
 func defaultSuccessProcessor(g *gin.Context, vs ...interface{}) (interface{}, error) {
-	if len(vs) > 0 {
-		v0 := vs[0]
-		if reflect.Indirect(reflect.ValueOf(v0)).Kind() == reflect.Struct {
-			g.JSON(http.StatusOK, v0)
-		} else {
-			g.String(http.StatusOK, fmt.Sprintf("%v", v0))
+	if len(vs) == 0 {
+		return nil, nil
+	}
+
+	v0 := vs[0]
+
+	if vj, ok := v0.(JSONValuer); ok {
+		jv, err := vj.JSONValue()
+		if err != nil {
+			return nil, err
 		}
+
+		g.JSON(http.StatusOK, jv)
+
+		return nil, nil
+	}
+
+	if reflect.Indirect(reflect.ValueOf(v0)).Kind() == reflect.Struct {
+		g.JSON(http.StatusOK, v0)
+	} else {
+		g.String(http.StatusOK, fmt.Sprintf("%v", v0))
 	}
 
 	return nil, nil
@@ -247,37 +267,44 @@ func MiddleWare(m bool) OptionFn { return func(option *Option) { option.MiddleWa
 
 // Adapt adapts convenient function to gi.HandleFunc.
 func (a *Adaptor) Adapt(fn HandlerFunc, optionFns ...OptionFn) gin.HandlerFunc {
+	option := a.makeOption(optionFns)
+	fv := reflect.ValueOf(fn)
+	errTp := a.findTypeProcessorOr(gor.ErrType, defaultErrorProcessor)
+
+	return func(c *gin.Context) {
+		if err := a.internalAdatpr(c, fv, option); err != nil {
+			_, _ = errTp(c, err)
+		}
+	}
+}
+
+func (a *Adaptor) internalAdatpr(c *gin.Context, fv reflect.Value, option *Option) error {
+	argVs, err := a.createArgs(c, fv, option)
+	if err != nil {
+		return err
+	}
+
+	fa := a.arounders[fv.Type()]
+
+	if err := around(fa, argVs, true); err != nil {
+		return err
+	}
+
+	r := fv.Call(argVs)
+
+	_ = around(fa, r, false)
+
+	return a.processOut(c, fv, r, option)
+}
+
+func (a *Adaptor) makeOption(optionFns []OptionFn) *Option {
 	option := &Option{}
 
 	for _, f := range optionFns {
 		f(option)
 	}
 
-	fv := reflect.ValueOf(fn)
-
-	errTp := a.findTypeProcessorOr(gor.ErrType, defaultErrorProcessor)
-
-	return func(c *gin.Context) {
-		argVs, err := a.createArgs(c, fv, option)
-		if err != nil {
-			_, _ = errTp(c, err)
-
-			return
-		}
-
-		fa := a.arounders[fv.Type()]
-		if err := around(fa, argVs, true); err != nil {
-			_, _ = errTp(c, err)
-		}
-
-		r := fv.Call(argVs)
-
-		_ = around(fa, r, false)
-
-		if err := a.processOut(c, fv, r, option); err != nil {
-			_, _ = errTp(c, err)
-		}
-	}
+	return option
 }
 
 func around(fa InvokeArounder, v []reflect.Value, before bool) error {
@@ -341,7 +368,7 @@ func (a *Adaptor) registerInjects(c *gin.Context, option *Option, numOut int, r 
 	for i := 0; i < numOut; i++ {
 		nonPtrRi := convertPtr(false, r[i])
 		if nonPtrRi.Kind() == reflect.Struct {
-			c.Set("_inject_"+nonPtrRi.Type().String(), convertPtr(true, r[i]))
+			c.Set(a.injectKey(nonPtrRi.Type()), convertPtr(true, r[i]))
 		}
 	}
 }
@@ -477,13 +504,21 @@ func createArgValues(c *gin.Context, argTags map[int][]reflect.StructTag) map[in
 	return args
 }
 
+func getFirstTagValues(argTags map[int][]reflect.StructTag, tagName string) (v string, ok bool) {
+	collectTagValues(argTags, tagName, func(tag string) bool {
+		v = tag
+		ok = true
+
+		return true
+	})
+
+	return
+}
 func collectTagValues(argTags map[int][]reflect.StructTag, tagName string, fn func(string) bool) {
 	for _, tags := range argTags {
 		for _, tag := range tags {
-			if v := tag.Get(tagName); v != "" {
-				if fn(v) {
-					return
-				}
+			if v, ok := tag.Lookup(tagName); ok && fn(v) {
+				return
 			}
 		}
 	}
@@ -515,7 +550,7 @@ func collectTags(args []argIn) map[int][]reflect.StructTag {
 			continue
 		}
 
-		if tags := findTags(arg.Type, _TType); len(tags) > 0 {
+		if tags := findTags(arg.Type, TType); len(tags) > 0 {
 			argTags[i] = tags
 		}
 	}
@@ -569,7 +604,7 @@ func (a *Adaptor) processStruct(c *gin.Context, arg argIn) (reflect.Value, error
 		return reflect.ValueOf(c), nil
 	}
 
-	if v, exists := c.Get("_inject_" + arg.Type.String()); exists {
+	if v, exists := c.Get(a.injectKey(arg.Type)); exists {
 		return convertPtr(arg.Ptr, v.(reflect.Value)), nil
 	}
 
@@ -589,6 +624,8 @@ func (a *Adaptor) processStruct(c *gin.Context, arg argIn) (reflect.Value, error
 
 	return argValue, nil
 }
+
+func (a *Adaptor) injectKey(t reflect.Type) string { return "_inject_" + t.String() }
 
 func convertPtr(isPtr bool, v reflect.Value) reflect.Value {
 	if !isPtr {
@@ -617,56 +654,56 @@ func convertPtr(isPtr bool, v reflect.Value) reflect.Value {
 // frequently used, non-standardized or custom methods (e.g. for internal
 // communication with a proxy).
 func (a *Routes) Handle(httpMethod, relativePath string, h HandlerFunc, fns ...OptionFn) IRoutes {
-	a.GinRoutes.Handle(httpMethod, relativePath, a.Adaptor.Adapt(h, fns...))
+	a.GinRouter.Handle(httpMethod, relativePath, a.Adaptor.Adapt(h, fns...))
 	return a
 }
 
 // POST is a shortcut for router.Handle("POST", path, handle).
 func (a *Routes) POST(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
-	a.GinRoutes.Handle("POST", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	a.GinRouter.Handle("POST", relativePath, a.Adaptor.Adapt(h, optionFns...))
 	return a
 }
 
 // GET is a shortcut for router.Handle("GET", path, handle).
 func (a *Routes) GET(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
-	a.GinRoutes.Handle("GET", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	a.GinRouter.Handle("GET", relativePath, a.Adaptor.Adapt(h, optionFns...))
 	return a
 }
 
 // DELETE is a shortcut for router.Handle("DELETE", path, handle).
 func (a *Routes) DELETE(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
-	a.GinRoutes.Handle("DELETE", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	a.GinRouter.Handle("DELETE", relativePath, a.Adaptor.Adapt(h, optionFns...))
 	return a
 }
 
 // PATCH is a shortcut for router.Handle("PATCH", path, handle).
 func (a *Routes) PATCH(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
-	a.GinRoutes.Handle("PATCH", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	a.GinRouter.Handle("PATCH", relativePath, a.Adaptor.Adapt(h, optionFns...))
 	return a
 }
 
 // PUT is a shortcut for router.Handle("PUT", path, handle).
 func (a *Routes) PUT(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
-	a.GinRoutes.Handle("PUT", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	a.GinRouter.Handle("PUT", relativePath, a.Adaptor.Adapt(h, optionFns...))
 	return a
 }
 
 // OPTIONS is a shortcut for router.Handle("OPTIONS", path, handle).
 func (a *Routes) OPTIONS(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
-	a.GinRoutes.Handle("OPTIONS", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	a.GinRouter.Handle("OPTIONS", relativePath, a.Adaptor.Adapt(h, optionFns...))
 	return a
 }
 
 // HEAD is a shortcut for router.Handle("HEAD", path, handle).
 func (a *Routes) HEAD(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
-	a.GinRoutes.Handle("HEAD", relativePath, a.Adaptor.Adapt(h, optionFns...))
+	a.GinRouter.Handle("HEAD", relativePath, a.Adaptor.Adapt(h, optionFns...))
 	return a
 }
 
 // Any registers a route that matches all the HTTP methods.
 // GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE, CONNECT, TRACE.
 func (a *Routes) Any(relativePath string, h HandlerFunc, optionFns ...OptionFn) IRoutes {
-	a.GinRoutes.Any(relativePath, a.Adaptor.Adapt(h, optionFns...))
+	a.GinRouter.Any(relativePath, a.Adaptor.Adapt(h, optionFns...))
 	return a
 }
 
@@ -692,13 +729,13 @@ type IRoutes interface {
 }
 
 // Route makes a route for Adaptor.
-func (a *Adaptor) Route(r gin.IRoutes) IRoutes {
-	return &Routes{GinRoutes: r, Adaptor: a}
+func (a *Adaptor) Route(r gin.IRouter) IRoutes {
+	return &Routes{GinRouter: r, Adaptor: a}
 }
 
 // Routes defines adaptor routes implemetation for IRoutes.
 type Routes struct {
-	GinRoutes gin.IRoutes
+	GinRouter gin.IRouter
 	Adaptor   *Adaptor
 }
 
@@ -736,18 +773,14 @@ func (a *Routes) handleFn(handlerName string, h HandlerFunc, ingoreIllegal bool)
 	for rounderName, factory := range a.Adaptor.arounderFactories {
 		f := factory
 
-		collectTagValues(tags, rounderName, func(v string) bool {
+		if v, ok := getFirstTagValues(tags, rounderName); ok {
 			a.Adaptor.arounders[ht] = f.Create(handlerName, v, h)
-			return true
-		})
+		}
 	}
 
-	url := ""
+	url, _ := getFirstTagValues(tags, "url")
 
-	collectTagValues(tags, "url", func(v string) bool { url = v; return true })
-
-	url = strings.TrimSpace(url)
-	if url == "" {
+	if url = strings.TrimSpace(url); url == "" {
 		if ingoreIllegal {
 			return
 		}
@@ -755,24 +788,23 @@ func (a *Routes) handleFn(handlerName string, h HandlerFunc, ingoreIllegal bool)
 		panic("unable to find url")
 	}
 
+	if method, relativePath := a.parseMethodRelativePath(url); method == anyMethod {
+		a.GinRouter.Any(relativePath, a.Adaptor.Adapt(h))
+	} else {
+		a.GinRouter.Handle(method, relativePath, a.Adaptor.Adapt(h))
+	}
+}
+
+const anyMethod = "ANY"
+
+func (a *Routes) parseMethodRelativePath(url string) (string, string) {
 	urlFields := strings.Fields(url)
 
-	method := ""
-	relativePath := ""
-
 	switch m := strings.ToUpper(urlFields[0]); m {
-	case "ANY", "GET", "POST", "DELETE", "PATCH", "PUT", "OPTIONS", "HEAD": // nolint goconst
-		method = m
-		relativePath = urlFields[1]
+	case anyMethod, "GET", "POST", "DELETE", "PATCH", "PUT", "OPTIONS", "HEAD": // nolint goconst
+		return m, urlFields[1]
 	default:
-		method = "ANY"
-		relativePath = urlFields[0]
-	}
-
-	if method != "ANY" {
-		a.GinRoutes.Handle(method, relativePath, a.Adaptor.Adapt(h))
-	} else {
-		a.GinRoutes.Any(relativePath, a.Adaptor.Adapt(h))
+		return anyMethod, urlFields[0]
 	}
 }
 
@@ -781,7 +813,7 @@ func (a *Routes) Use(h HandlerFunc, optionFns ...OptionFn) IRoutes {
 	fns := make([]OptionFn, len(optionFns)+1) // nolint gomnd
 	copy(fns, optionFns)
 	fns[len(optionFns)] = MiddleWare(true)
-	a.GinRoutes.Use(a.Adaptor.Adapt(h, fns...))
+	a.GinRouter.Use(a.Adaptor.Adapt(h, fns...))
 
 	return a
 }
@@ -792,9 +824,8 @@ var _ IRoutes = (*Routes)(nil)
 type T interface{ t() }
 
 var (
-	// _TType defines the type of T.
-	// nolint gochecknoglobals
-	_TType = reflect.TypeOf((*T)(nil)).Elem()
+	// TType defines the type of T.
+	TType = reflect.TypeOf((*T)(nil)).Elem() // nolint gochecknoglobals
 )
 
 // InvokeArounderFactory defines the factory to create InvokeArounder
