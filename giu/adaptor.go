@@ -33,6 +33,7 @@ func NewAdaptor() *Adaptor {
 	}
 }
 
+// RegisterInvokeArounder register arounder for the adaptor.
 func (a *Adaptor) RegisterInvokeArounder(arounderName string, arounder InvokeArounderFactory) {
 	a.arounderFactories[arounderName] = arounder
 }
@@ -294,6 +295,7 @@ func around(fa InvokeArounder, v []reflect.Value, before bool) error {
 	}
 
 	fa.After(args)
+
 	return nil
 }
 
