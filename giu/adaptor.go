@@ -124,7 +124,7 @@ type JSONValuer interface {
 	JSONValue() (interface{}, error)
 }
 
-func defaultSuccessProcessor(g *gin.Context, vs ...interface{}) (interface{}, error) {
+func defaultSuccProcessor(g *gin.Context, vs ...interface{}) (interface{}, error) {
 	if len(vs) == 0 {
 		return nil, nil
 	}
@@ -142,11 +142,23 @@ func defaultSuccessProcessor(g *gin.Context, vs ...interface{}) (interface{}, er
 		return nil, nil
 	}
 
-	if reflect.Indirect(reflect.ValueOf(v0)).Kind() == reflect.Struct {
-		g.JSON(http.StatusOK, v0)
-	} else {
-		g.String(http.StatusOK, fmt.Sprintf("%v", v0))
+	if len(vs) == 1 { // nolint gomnd
+		if reflect.Indirect(reflect.ValueOf(v0)).Kind() == reflect.Struct {
+			g.JSON(http.StatusOK, v0)
+		} else {
+			g.String(http.StatusOK, fmt.Sprintf("%v", v0))
+		}
+
+		return nil, nil
 	}
+
+	m := make(map[string]interface{})
+
+	for _, v := range vs {
+		m[reflect.TypeOf(v).String()] = v
+	}
+
+	g.JSON(http.StatusOK, m)
 
 	return nil, nil
 }
@@ -353,7 +365,7 @@ func (a *Adaptor) succProcess(c *gin.Context, numOut int, r []reflect.Value) {
 		vs[i] = r[i].Interface()
 	}
 
-	p := a.findTypeProcessorOr(SuccInvokedType, defaultSuccessProcessor)
+	p := a.findTypeProcessorOr(SuccInvokedType, defaultSuccProcessor)
 	_, _ = p(c, vs...)
 }
 

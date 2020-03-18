@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -52,8 +53,16 @@ func TestUMP(t *testing.T) {
 			c.JSON(http.StatusOK, Rsp{State: http.StatusOK, Data: "ok"}) // 如何处理无返回(单独error返回除外)
 		} else if rsp, ok := vs[0].(Rsp); ok { // 返回已经是Rsp类型，不再包装
 			c.JSON(http.StatusOK, rsp)
-		} else {
+		} else if len(vs) == 1 {
 			c.JSON(http.StatusOK, Rsp{State: http.StatusOK, Data: vs[0]}) // 选取第一个返回参数，JSON返回
+		} else {
+			m := make(map[string]interface{})
+
+			for _, v := range vs {
+				m[reflect.TypeOf(v).String()] = v
+			}
+
+			c.JSON(http.StatusOK, m)
 		}
 	})
 
