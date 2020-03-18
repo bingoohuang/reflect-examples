@@ -84,9 +84,7 @@ func (a *Adaptor) findTypeProcessorOr(t reflect.Type, defaultProcessor TypeProce
 }
 
 // SuccInvoked represents the adaptor is invoked successfully with returned value.
-type SuccInvoked interface {
-	SuccessfullyInvoked()
-}
+type SuccInvoked interface{ succInvoked() }
 
 var (
 	// SuccInvokedType defines the successfully adaptor invoke's type.
@@ -713,8 +711,7 @@ func (a *Routes) Any(relativePath string, h HandlerFunc, optionFns ...OptionFn) 
 }
 
 // HandlerFunc defines the handler used by gin middleware as return value.
-type HandlerFunc interface {
-}
+type HandlerFunc interface{}
 
 // IRoutes defines all router handle interface.
 type IRoutes interface {
@@ -736,23 +733,21 @@ type IRoutes interface {
 // Route makes a route for Adaptor.
 func (a *Adaptor) Route(r gin.IRouter) IRoutes { return &Routes{GinRouter: r, Adaptor: a} }
 
+// Keep keeps the URL ralative data.
 type Keep struct {
 	Path    string
 	Keep    string
 	Methods []string
 }
 
-type KeepResponseWriter struct {
+type keepResponseWriter struct {
 	http.ResponseWriter
-
 	keep *Keep
 }
 
+// FindKeep finds the keep data for the current request.
 func (a *Adaptor) FindKeep(c *gin.Context) *Keep {
-	kw := &KeepResponseWriter{
-		ResponseWriter: httptest.NewRecorder(),
-	}
-
+	kw := &keepResponseWriter{ResponseWriter: httptest.NewRecorder()}
 	a.router.ServeHTTP(kw, c.Request)
 
 	return kw.keep
@@ -760,7 +755,7 @@ func (a *Adaptor) FindKeep(c *gin.Context) *Keep {
 
 func (a *Adaptor) keep(methods []string, hasAny bool, absolutePath, keep string) {
 	f := func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		if kw, ok := w.(*KeepResponseWriter); ok {
+		if kw, ok := w.(*keepResponseWriter); ok {
 			kw.keep = &Keep{Path: absolutePath, Keep: keep, Methods: methods}
 		}
 	}
@@ -777,15 +772,9 @@ func (a *Adaptor) keep(methods []string, hasAny bool, absolutePath, keep string)
 // any registers a route that matches all the HTTP methods.
 // GET, POST, PUT, PATCH, HEAD, OPTIONS, DELETE, CONNECT, TRACE.
 func (a *Adaptor) any(relativePath string, handlers httprouter.Handle) {
-	a.router.Handle("GET", relativePath, handlers)
-	a.router.Handle("POST", relativePath, handlers)
-	a.router.Handle("PUT", relativePath, handlers)
-	a.router.Handle("PATCH", relativePath, handlers)
-	a.router.Handle("HEAD", relativePath, handlers)
-	a.router.Handle("OPTIONS", relativePath, handlers)
-	a.router.Handle("DELETE", relativePath, handlers)
-	a.router.Handle("CONNECT", relativePath, handlers)
-	a.router.Handle("TRACE", relativePath, handlers)
+	for _, m := range []string{"GET", "POST", "PUT", "PATCH", "HEAD", "OPTIONS", "DELETE", "CONNECT", "TRACE"} {
+		a.router.Handle(m, relativePath, handlers)
+	}
 }
 
 // Routes defines adaptor routes implemetation for IRoutes.
@@ -845,20 +834,24 @@ func (a *Routes) handleFn(handlerName string, h HandlerFunc, ignoreIllegal bool)
 
 	methods, hasAny, relativePath := a.parseMethodRelativePath(url)
 
-	if keep, _ := getFirstTagValues(tags, "keep"); keep != "" {
-		type basePather interface{ BasePath() string }
-
-		if bp, ok := a.GinRouter.(basePather); ok {
-			absolutePath := joinPaths(bp.BasePath(), relativePath)
-			a.Adaptor.keep(methods, hasAny, absolutePath, keep)
-		}
-	}
+	a.registerKeep(tags, relativePath, methods, hasAny)
 
 	if hasAny {
 		a.GinRouter.Any(relativePath, a.Adaptor.Adapt(h))
 	} else {
 		for _, method := range methods {
 			a.GinRouter.Handle(method, relativePath, a.Adaptor.Adapt(h))
+		}
+	}
+}
+
+func (a *Routes) registerKeep(tags map[int][]reflect.StructTag, relativePath string, methods []string, hasAny bool) {
+	if keep, _ := getFirstTagValues(tags, "keep"); keep != "" {
+		type basePather interface{ BasePath() string }
+
+		if bp, ok := a.GinRouter.(basePather); ok {
+			absolutePath := joinPaths(bp.BasePath(), relativePath)
+			a.Adaptor.keep(methods, hasAny, absolutePath, keep)
 		}
 	}
 }
