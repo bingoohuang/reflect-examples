@@ -188,24 +188,16 @@ func (u urlParams) Expands() []Param {
 	return params
 }
 
-type urlParam struct {
-	key string
-}
+type urlParam struct{ key string }
 
 // URLParams defines the URL param in the URL PATH.
-func URLParams(keys ...string) ExpandableParam {
-	return urlParams{keys: keys}
-}
+func URLParams(keys ...string) ExpandableParam { return urlParams{keys: keys} }
 
-func (u urlParam) Get(g *gin.Context) string {
-	return g.Param(u.key)
-}
+func (u urlParam) Get(g *gin.Context) string { return g.Param(u.key) }
 
 var _ Param = (*urlParam)(nil)
 
-type queryParams struct {
-	keys []string
-}
+type queryParams struct{ keys []string }
 
 func (q queryParams) Expands() []Param {
 	params := make([]Param, len(q.keys))
@@ -260,9 +252,7 @@ func Params(ps ...ExpandableParam) OptionFn {
 		params = append(params, p.Expands()...)
 	}
 
-	return func(option *Option) {
-		option.Params = params
-	}
+	return func(option *Option) { option.Params = params }
 }
 
 // MiddleWare defines the middleWare flag for the adaptor.
@@ -345,22 +335,26 @@ func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value
 		numOut-- // drop the error returned by the adapted.
 	}
 
-	vs := make([]interface{}, numOut)
-
 	a.registerInjects(c, option, numOut, r)
-
-	for i := 0; i < numOut; i++ {
-		vs[i] = r[i].Interface()
-	}
 
 	if option.MiddleWare {
 		return nil
 	}
 
-	p := a.findTypeProcessorOr(SuccInvokedType, defaultSuccessProcessor)
-	_, _ = p(c, vs...)
+	a.succProcess(c, numOut, r)
 
 	return nil
+}
+
+func (a *Adaptor) succProcess(c *gin.Context, numOut int, r []reflect.Value) {
+	vs := make([]interface{}, numOut)
+
+	for i := 0; i < numOut; i++ {
+		vs[i] = r[i].Interface()
+	}
+
+	p := a.findTypeProcessorOr(SuccInvokedType, defaultSuccessProcessor)
+	_, _ = p(c, vs...)
 }
 
 func (a *Adaptor) registerInjects(c *gin.Context, option *Option, numOut int, r []reflect.Value) {
@@ -386,14 +380,12 @@ type argIn struct {
 
 func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (v []reflect.Value, err error) {
 	ft := fv.Type()
-	numIn := ft.NumIn()
 	argIns := parseArgIns(ft)
 	argAsTags := collectTags(argIns)
 	argValuesByTag := createArgValues(c, argAsTags)
-	primitiveArgsNum := countPrimitiveArgs(argIns, argAsTags)
-	pArg := singlePrimitiveValue(c, primitiveArgsNum)
+	pArg := singlePrimitiveValue(c, countPrimitiveArgs(argIns, argAsTags))
 
-	v = make([]reflect.Value, numIn)
+	v = make([]reflect.Value, ft.NumIn())
 
 	for i, arg := range argIns {
 		if v[i], err = a.createArgValue(c, argValuesByTag, argAsTags, arg, pArg, option); err != nil {
@@ -565,8 +557,7 @@ func findTags(t reflect.Type, target reflect.Type) []reflect.StructTag {
 	tags := make([]reflect.StructTag, 0)
 
 	for i := 0; i < t.NumField(); i++ {
-		tf := t.Field(i)
-		if tf.Type == target {
+		if tf := t.Field(i); tf.Type == target {
 			tags = append(tags, tf.Tag)
 		}
 	}
@@ -593,13 +584,7 @@ func parseArgs(ft reflect.Type, argIndex int) argIn {
 		argType = argType.Elem()
 	}
 
-	return argIn{
-		Index:          argIndex,
-		Type:           argType,
-		Kind:           argType.Kind(),
-		Ptr:            ptr,
-		PrimitiveIndex: -1,
-	}
+	return argIn{Index: argIndex, Type: argType, Kind: argType.Kind(), Ptr: ptr, PrimitiveIndex: -1}
 }
 
 func (a *Adaptor) processStruct(c *gin.Context, arg argIn) (reflect.Value, error) {
@@ -733,7 +718,7 @@ type IRoutes interface {
 // Route makes a route for Adaptor.
 func (a *Adaptor) Route(r gin.IRouter) IRoutes { return &Routes{GinRouter: r, Adaptor: a} }
 
-// Keep keeps the URL ralative data.
+// Keep keeps the URL related data.
 type Keep struct {
 	Path    string
 	Keep    string
@@ -815,10 +800,8 @@ func (a *Routes) handleFn(handlerName string, h HandlerFunc, ignoreIllegal bool)
 	tags := collectTags(parseArgIns(ht))
 
 	for rounderName, factory := range a.Adaptor.arounderFactories {
-		f := factory
-
 		if v, ok := getFirstTagValues(tags, rounderName); ok {
-			a.Adaptor.arounders[ht] = f.Create(handlerName, v, h)
+			a.Adaptor.arounders[ht] = factory.Create(handlerName, v, h)
 		}
 	}
 
@@ -873,11 +856,11 @@ func joinPaths(absolutePath, relativePath string) string {
 }
 
 func lastChar(str string) uint8 {
-	if str == "" {
-		panic("The length of the string can't be 0")
+	if str != "" {
+		return str[len(str)-1]
 	}
 
-	return str[len(str)-1]
+	panic("The length of the string can't be 0")
 }
 
 const anyMethod = "ANY"
@@ -892,7 +875,6 @@ func (a *Routes) parseMethodRelativePath(url string) ([]string, bool, string) {
 
 	allMethodsStr := strings.ToUpper(urlFields[0])
 	allMethods := strings.Split(allMethodsStr, "/")
-
 	methodMap := make(map[string]bool)
 	hasAny := false
 
