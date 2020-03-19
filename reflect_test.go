@@ -5,6 +5,8 @@ import (
 	"image"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type t int // A type definition
@@ -52,4 +54,11 @@ func report(x interface{}) {
 	}
 
 	fmt.Println()
+}
+
+type MyMap map[string]interface{}
+
+func TestMyMap(t *testing.T) {
+	v := reflect.ValueOf(MyMap(map[string]interface{}{}))
+	assert.Equal(t, reflect.Map, v.Type().Kind())
 }

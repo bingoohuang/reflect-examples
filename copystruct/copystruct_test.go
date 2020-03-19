@@ -501,13 +501,11 @@ func TestField_NullTypes(t *testing.T) {
 		SQLNullBoolInvalidPtr *bool `copystruct:"force"`
 	}
 
-	now := time.Now()
-
 	src := &Src{
-		PQNullTimeValid:      pq.NullTime{Valid: true, Time: now},
-		PQNullTimeValidPtr:   pq.NullTime{Valid: true, Time: now},
-		PQNullTimeInvalid:    pq.NullTime{Valid: false, Time: now},
-		PQNullTimeInvalidPtr: pq.NullTime{Valid: false, Time: now},
+		PQNullTimeValid:      pq.NullTime{Valid: true, Time: time.Now()},
+		PQNullTimeValidPtr:   pq.NullTime{Valid: true, Time: time.Now()},
+		PQNullTimeInvalid:    pq.NullTime{Valid: false, Time: time.Now()},
+		PQNullTimeInvalidPtr: pq.NullTime{Valid: false, Time: time.Now()},
 
 		NullStringValid:      null.NewString("hello", true),
 		NullStringValidPtr:   null.NewString("hello", true),
@@ -531,10 +529,10 @@ func TestField_NullTypes(t *testing.T) {
 	}
 
 	srcForce := &SrcForce{
-		PQNullTimeValid:      pq.NullTime{Valid: true, Time: now},
-		PQNullTimeValidPtr:   pq.NullTime{Valid: true, Time: now},
-		PQNullTimeInvalid:    pq.NullTime{Valid: false, Time: now},
-		PQNullTimeInvalidPtr: pq.NullTime{Valid: false, Time: now},
+		PQNullTimeValid:      pq.NullTime{Valid: true, Time: time.Now()},
+		PQNullTimeValidPtr:   pq.NullTime{Valid: true, Time: time.Now()},
+		PQNullTimeInvalid:    pq.NullTime{Valid: false, Time: time.Now()},
+		PQNullTimeInvalidPtr: pq.NullTime{Valid: false, Time: time.Now()},
 
 		NullStringValid:      null.NewString("hello", true),
 		NullStringValidPtr:   null.NewString("hello", true),
