@@ -124,32 +124,48 @@ type JSONValuer interface {
 	JSONValue() (interface{}, error)
 }
 
+// HTTPStatus defines the type of HTTP state.
+type HTTPStatus int
+
 func defaultSuccProcessor(g *gin.Context, vs ...interface{}) (interface{}, error) {
-	if len(vs) == 0 {
-		return nil, nil
+	if len(vs) > 0 {
+		_ = defaultSuccProcessorInternal(&ginContext{g}, vs...)
 	}
 
-	v0 := vs[0]
+	return nil, nil
+}
 
-	if vj, ok := v0.(JSONValuer); ok {
-		jv, err := vj.JSONValue()
-		if err != nil {
-			return nil, err
-		}
+// responder responds the http request.
+type responder interface {
+	Status(code int) error
+	JSON(code int, obj interface{}) error
+	String(code int, format string, values ...interface{}) error
+}
 
-		g.JSON(http.StatusOK, jv)
+type ginContext struct {
+	*gin.Context
+}
 
-		return nil, nil
+func (g *ginContext) Status(code int) error                { g.Context.Status(code); return nil }
+func (g *ginContext) JSON(code int, obj interface{}) error { g.Context.JSON(code, obj); return nil }
+func (g *ginContext) String(code int, format string, values ...interface{}) error {
+	g.Context.String(code, format, values...)
+	return nil
+}
+
+func defaultSuccProcessorInternal(g responder, vs ...interface{}) error {
+	code, vs := findStateCode(vs)
+
+	if len(vs) == 0 {
+		return g.Status(code)
+	}
+
+	if found, err := findJSONValuer(g, vs, code); found {
+		return err
 	}
 
 	if len(vs) == 1 { // nolint gomnd
-		if reflect.Indirect(reflect.ValueOf(v0)).Kind() == reflect.Struct {
-			g.JSON(http.StatusOK, v0)
-		} else {
-			g.String(http.StatusOK, fmt.Sprintf("%v", v0))
-		}
-
-		return nil, nil
+		return respondOne(g, vs, code)
 	}
 
 	m := make(map[string]interface{})
@@ -158,9 +174,46 @@ func defaultSuccProcessor(g *gin.Context, vs ...interface{}) (interface{}, error
 		m[reflect.TypeOf(v).String()] = v
 	}
 
-	g.JSON(http.StatusOK, m)
+	return g.JSON(code, m)
+}
 
-	return nil, nil
+func respondOne(g responder, vs []interface{}, code int) error {
+	switch v0 := vs[0]; reflect.Indirect(reflect.ValueOf(v0)).Kind() {
+	case reflect.Struct, reflect.Map:
+		return g.JSON(code, v0)
+	default:
+		return g.String(code, "%v", v0)
+	}
+}
+
+func findJSONValuer(g responder, vs []interface{}, code int) (bool, error) {
+	for _, v := range vs {
+		if vj, ok := v.(JSONValuer); ok {
+			jv, err := vj.JSONValue()
+			if err != nil {
+				return true, err
+			}
+
+			return true, g.JSON(code, jv)
+		}
+	}
+
+	return false, nil
+}
+
+func findStateCode(vs []interface{}) (int, []interface{}) {
+	code := http.StatusOK
+	vvs := make([]interface{}, 0, len(vs))
+
+	for _, v := range vs {
+		if vv, ok := v.(HTTPStatus); ok {
+			code = int(vv)
+		} else {
+			vvs = append(vvs, v)
+		}
+	}
+
+	return code, vvs
 }
 
 func defaultErrorProcessor(g *gin.Context, vs ...interface{}) (interface{}, error) {
