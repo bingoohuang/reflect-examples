@@ -53,7 +53,7 @@ func (a *Adaptor) RegisterErrProcessor(p Processor) {
 
 // RegisterSuccProcessor typeProcessors a type processor for the successful deal.
 func (a *Adaptor) RegisterSuccProcessor(p Processor) {
-	a.typeProcessors[GetNonPtrType(SuccInvokedType)] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
+	a.typeProcessors[NonPtrTypeOf(SuccInvokedType)] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
 		p(c, args...)
 		return nil, nil
 	}
@@ -61,7 +61,7 @@ func (a *Adaptor) RegisterSuccProcessor(p Processor) {
 
 // RegisterTypeProcessor typeProcessors a type processor for the type.
 func (a *Adaptor) RegisterTypeProcessor(t interface{}, p TypeProcessor) {
-	a.typeProcessors[GetNonPtrType(t)] = p
+	a.typeProcessors[NonPtrTypeOf(t)] = p
 }
 
 func (a *Adaptor) findTypeProcessor(t reflect.Type) TypeProcessor {
@@ -83,17 +83,15 @@ func (a *Adaptor) findTypeProcessorOr(t reflect.Type, defaultProcessor TypeProce
 	return defaultProcessor
 }
 
-// SuccInvoked represents the adaptor is invoked successfully with returned value.
-type SuccInvoked interface{ succInvoked() }
+// succInvoked represents the adaptor is invoked successfully with returned value.
+type succInvoked interface{ succInvoked() }
 
-var (
-	// SuccInvokedType defines the successfully adaptor invoke's type.
-	// nolint gochecknoglobals
-	SuccInvokedType = reflect.TypeOf((*SuccInvoked)(nil)).Elem()
-)
+// SuccInvokedType defines the successfully adaptor invoke's type.
+// nolint gochecknoglobals
+var SuccInvokedType = reflect.TypeOf((*succInvoked)(nil)).Elem()
 
-// GetNonPtrType returns the non-ptr type of v.
-func GetNonPtrType(v interface{}) reflect.Type {
+// NonPtrTypeOf returns the non-ptr type of v.
+func NonPtrTypeOf(v interface{}) reflect.Type {
 	if vt, ok := v.(reflect.Type); ok {
 		return vt
 	}
@@ -165,7 +163,7 @@ func defaultSuccProcessorInternal(g responder, vs ...interface{}) error {
 	}
 
 	if len(vs) == 1 { // nolint gomnd
-		return respondOne(g, vs, code)
+		return respondOut1(g, vs, code)
 	}
 
 	m := make(map[string]interface{})
@@ -177,7 +175,7 @@ func defaultSuccProcessorInternal(g responder, vs ...interface{}) error {
 	return g.JSON(code, m)
 }
 
-func respondOne(g responder, vs []interface{}, code int) error {
+func respondOut1(g responder, vs []interface{}, code int) error {
 	switch v0 := vs[0]; reflect.Indirect(reflect.ValueOf(v0)).Kind() {
 	case reflect.Struct, reflect.Map:
 		return g.JSON(code, v0)
@@ -300,7 +298,7 @@ func (u queryParam) Get(g *gin.Context) string {
 
 var _ Param = (*queryParam)(nil)
 
-// Option defines the adatpor's option.
+// Option defines the adaptor's option.
 type Option struct {
 	Params     []Param
 	MiddleWare bool
@@ -325,18 +323,18 @@ func MiddleWare(m bool) OptionFn { return func(option *Option) { option.MiddleWa
 
 // Adapt adapts convenient function to gi.HandleFunc.
 func (a *Adaptor) Adapt(fn HandlerFunc, optionFns ...OptionFn) gin.HandlerFunc {
-	option := a.makeOption(optionFns)
 	fv := reflect.ValueOf(fn)
+	option := a.makeOption(optionFns)
 	errTp := a.findTypeProcessorOr(gor.ErrType, defaultErrorProcessor)
 
 	return func(c *gin.Context) {
-		if err := a.internalAdatpr(c, fv, option); err != nil {
+		if err := a.internalAdapter(c, fv, option); err != nil {
 			_, _ = errTp(c, err)
 		}
 	}
 }
 
-func (a *Adaptor) internalAdatpr(c *gin.Context, fv reflect.Value, option *Option) error {
+func (a *Adaptor) internalAdapter(c *gin.Context, fv reflect.Value, option *Option) error {
 	argVs, err := a.createArgs(c, fv, option)
 	if err != nil {
 		return err
@@ -446,14 +444,14 @@ type argIn struct {
 func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (v []reflect.Value, err error) {
 	ft := fv.Type()
 	argIns := parseArgIns(ft)
-	argAsTags := collectTags(argIns)
-	argValuesByTag := createArgValues(c, argAsTags)
-	pArg := singlePrimitiveValue(c, countPrimitiveArgs(argIns, argAsTags))
+	argTags := collectTags(argIns)
+	argValuesByTag := argTags.createArgValues(c)
+	pArg := singlePrimitiveValue(c, argTags.countPrimitiveArgs(argIns))
 
 	v = make([]reflect.Value, ft.NumIn())
 
 	for i, arg := range argIns {
-		if v[i], err = a.createArgValue(c, argValuesByTag, argAsTags, arg, pArg, option); err != nil {
+		if v[i], err = a.createArgValue(c, argValuesByTag, argTags, arg, pArg, option); err != nil {
 			return nil, err
 		}
 	}
@@ -480,11 +478,11 @@ func singlePrimitiveValue(c *gin.Context, primitiveArgsNum int) string {
 	return ""
 }
 
-func countPrimitiveArgs(argIns []argIn, argAsTags map[int][]reflect.StructTag) int {
+func (t ArgsTags) countPrimitiveArgs(argIns []argIn) int {
 	primitiveArgsNum := 0
 
 	for i, arg := range argIns {
-		if _, ok := argAsTags[i]; ok || arg.Kind == reflect.Struct {
+		if _, ok := t[i]; ok || arg.Kind == reflect.Struct {
 			continue
 		}
 
@@ -496,7 +494,7 @@ func countPrimitiveArgs(argIns []argIn, argAsTags map[int][]reflect.StructTag) i
 }
 
 func (a *Adaptor) createArgValue(c *gin.Context, argValuesByTag map[int]string,
-	argAsTags map[int][]reflect.StructTag, arg argIn, singleArgValue string, option *Option) (reflect.Value, error) {
+	argAsTags ArgsTags, arg argIn, singleArgValue string, option *Option) (reflect.Value, error) {
 	if _, ok := argAsTags[arg.Index]; ok {
 		return convertPtr(arg.Ptr, reflect.New(arg.Type)), nil
 	}
@@ -550,10 +548,10 @@ func parseArgIns(ft reflect.Type) []argIn {
 	return argIns
 }
 
-func createArgValues(c *gin.Context, argTags map[int][]reflect.StructTag) map[int]string {
+func (t ArgsTags) createArgValues(c *gin.Context) map[int]string {
 	args := map[int]string{}
 
-	collectTagValues(argTags, "arg", func(v string) bool {
+	t.collectTagValues("arg", func(v string) bool {
 		for _, argItem := range strings.Split(v, "/") {
 			parseTags(c, argItem, args)
 		}
@@ -564,8 +562,8 @@ func createArgValues(c *gin.Context, argTags map[int][]reflect.StructTag) map[in
 	return args
 }
 
-func getFirstTagValues(argTags map[int][]reflect.StructTag, tagName string) (v string, ok bool) {
-	collectTagValues(argTags, tagName, func(tag string) bool {
+func (t ArgsTags) getFirstTagValues(tagName string) (v string, ok bool) {
+	t.collectTagValues(tagName, func(tag string) bool {
 		v = tag
 		ok = true
 
@@ -574,8 +572,9 @@ func getFirstTagValues(argTags map[int][]reflect.StructTag, tagName string) (v s
 
 	return
 }
-func collectTagValues(argTags map[int][]reflect.StructTag, tagName string, fn func(string) bool) {
-	for _, tags := range argTags {
+
+func (t ArgsTags) collectTagValues(tagName string, fn func(string) bool) {
+	for _, tags := range t {
 		for _, tag := range tags {
 			if v, ok := tag.Lookup(tagName); ok && fn(v) {
 				return
@@ -602,8 +601,10 @@ func parseTags(c *gin.Context, arg string, args map[int]string) {
 	}
 }
 
-func collectTags(args []argIn) map[int][]reflect.StructTag {
-	argTags := make(map[int][]reflect.StructTag)
+type ArgsTags map[int][]reflect.StructTag
+
+func collectTags(args []argIn) ArgsTags {
+	argTags := make(ArgsTags)
 
 	for i, arg := range args {
 		if arg.Kind != reflect.Struct {
@@ -653,7 +654,7 @@ func parseArgs(ft reflect.Type, argIndex int) argIn {
 }
 
 func (a *Adaptor) processStruct(c *gin.Context, arg argIn) (reflect.Value, error) {
-	if arg.Ptr && arg.Type == GetNonPtrType(c) { // 直接注入gin.Context
+	if arg.Ptr && arg.Type == NonPtrTypeOf(c) { // 直接注入gin.Context
 		return reflect.ValueOf(c), nil
 	}
 
@@ -865,12 +866,12 @@ func (a *Routes) handleFn(handlerName string, h HandlerFunc, ignoreIllegal bool)
 	tags := collectTags(parseArgIns(ht))
 
 	for rounderName, factory := range a.Adaptor.arounderFactories {
-		if v, ok := getFirstTagValues(tags, rounderName); ok {
+		if v, ok := tags.getFirstTagValues(rounderName); ok {
 			a.Adaptor.arounders[ht] = factory.Create(handlerName, v, h)
 		}
 	}
 
-	url, _ := getFirstTagValues(tags, "url")
+	url, _ := tags.getFirstTagValues("url")
 
 	if url = strings.TrimSpace(url); url == "" {
 		if ignoreIllegal {
@@ -893,8 +894,8 @@ func (a *Routes) handleFn(handlerName string, h HandlerFunc, ignoreIllegal bool)
 	}
 }
 
-func (a *Routes) registerKeep(tags map[int][]reflect.StructTag, relativePath string, methods []string, hasAny bool) {
-	if keep, _ := getFirstTagValues(tags, "keep"); keep != "" {
+func (a *Routes) registerKeep(tags ArgsTags, relativePath string, methods []string, hasAny bool) {
+	if keep, _ := tags.getFirstTagValues("keep"); keep != "" {
 		type basePather interface{ BasePath() string }
 
 		if bp, ok := a.GinRouter.(basePather); ok {
