@@ -2,9 +2,11 @@ package giu
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	"net/http/httptest"
 	"path"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -30,12 +32,17 @@ type Adaptor struct {
 
 // NewAdaptor makes a new Adaptor.
 func NewAdaptor() *Adaptor {
-	return &Adaptor{
+	a := &Adaptor{
 		typeProcessors:    make(map[reflect.Type]TypeProcessor),
 		arounderFactories: make(map[string]InvokeArounderFactory),
 		arounders:         make(map[reflect.Type]InvokeArounder),
 		router:            httprouter.New(),
 	}
+
+	a.RegisterTypeProcessor(reflect.TypeOf((*DownloadFile)(nil)).Elem(), downloadFileProcessor)
+	a.RegisterTypeProcessor(reflect.TypeOf((*DirectResponse)(nil)).Elem(), directResponseProcessor)
+
+	return a
 }
 
 // RegisterInvokeArounder register arounder for the adaptor.
@@ -53,10 +60,11 @@ func (a *Adaptor) RegisterErrProcessor(p Processor) {
 
 // RegisterSuccProcessor typeProcessors a type processor for the successful deal.
 func (a *Adaptor) RegisterSuccProcessor(p Processor) {
-	a.typeProcessors[NonPtrTypeOf(SuccInvokedType)] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
-		p(c, args...)
-		return nil, nil
-	}
+	a.typeProcessors[NonPtrTypeOf(SuccInvokedType)] =
+		func(c *gin.Context, args ...interface{}) (interface{}, error) {
+			p(c, args...)
+			return nil, nil
+		}
 }
 
 // RegisterTypeProcessor typeProcessors a type processor for the type.
@@ -414,6 +422,13 @@ func (a *Adaptor) succProcess(c *gin.Context, numOut int, r []reflect.Value) {
 
 	for i := 0; i < numOut; i++ {
 		vs[i] = r[i].Interface()
+	}
+
+	if numOut > 0 {
+		if tp := a.findTypeProcessorOr(r[0].Type(), nil); tp != nil {
+			_, _ = tp(c, vs...)
+			return
+		}
 	}
 
 	p := a.findTypeProcessorOr(SuccInvokedType, defaultSuccProcessor)
@@ -998,4 +1013,71 @@ type InvokeArounder interface {
 
 	// After will be called after the adaptee invoking.
 	After(outs []interface{})
+}
+
+// DirectResponse represents the direct response.
+type DirectResponse struct {
+	Code  int
+	Error error
+}
+
+// directResponseProcessor is the processor for DirectResponse.
+func directResponseProcessor(c *gin.Context, args ...interface{}) (interface{}, error) {
+	dr := args[0].(DirectResponse)
+	if dr.Code == 0 {
+		dr.Code = http.StatusOK
+	}
+
+	_ = c.AbortWithError(dr.Code, dr.Error)
+
+	return nil, nil
+}
+
+// DownloadFile represents the file to be downloaded.
+type DownloadFile struct {
+	DiskFile    string
+	Filename    string
+	FileContent []byte
+}
+
+// downloadFileProcessor is the processor for a specified type.
+func downloadFileProcessor(c *gin.Context, args ...interface{}) (interface{}, error) {
+	downloadFile := args[0].(DownloadFile)
+	cd := createContentDisposition(downloadFile)
+
+	c.Header("Content-Disposition", cd)
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Header("Expires", "0")
+	c.Header("Cache-Control", "must-revalidate")
+	c.Header("Pragma", "public")
+
+	if downloadFile.DiskFile != "" {
+		c.File(downloadFile.DiskFile)
+		return nil, nil
+	}
+
+	_, _ = c.Writer.Write(downloadFile.FileContent)
+
+	return nil, nil
+}
+
+func createContentDisposition(downloadFile DownloadFile) string {
+	m := map[string]string{"filename": getDownloadFilename(downloadFile)}
+	return mime.FormatMediaType("attachment", m)
+}
+
+func getDownloadFilename(downloadFile DownloadFile) string {
+	filename := downloadFile.Filename
+
+	if filename == "" {
+		filename = filepath.Base(downloadFile.DiskFile)
+	}
+
+	if filename != "" {
+		return filename
+	}
+
+	return "downloadFile"
 }

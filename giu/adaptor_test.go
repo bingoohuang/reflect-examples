@@ -130,6 +130,7 @@ func TestUMP(t *testing.T) {
 	gr.GET("/Get3/:name", f3)
 	gr.GET("/Get31/:name", f31)
 	gr.GET("/Get4", f4)
+	gr.GET("/Get5", f5)
 
 	gr.HandleFn(f22)
 
@@ -202,6 +203,10 @@ func f4(name string, age int, _ struct {
 	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 }
 
+func f5() giu.DownloadFile {
+	return giu.DownloadFile{DiskFile: "testdata/hello.txt"}
+}
+
 func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine) {
 	checkStatusOK(t, resp, c, r, "/GetAge1/bingoo", "TestAuthUser/bingoo")
 	checkStatusOK(t, resp, c, r, "/GetAge2/bingoo", "TestAuthUser/bingoo")
@@ -223,6 +228,13 @@ func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context
 	checkStatusOK(t, resp, c, r, "/url", "/url")
 	checkStatusOK(t, resp, c, r, "/MyObject1", "Test")
 	checkStatusOK(t, resp, c, r, "/MyObject2", "Test")
+	//checkStatusOK(t, resp, c, r, "/Get5", "Test")
+
+	c.Request, _ = http.NewRequest(http.MethodGet, "/Get5", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(t, http.StatusOK, resp.Code)
+	body, _ := ioutil.ReadAll(resp.Body)
+	assert.Equal(t, "bingoohuang", strings.TrimSpace(string(body)))
 }
 
 func checkStatusOK(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine, url string, d interface{}) {
