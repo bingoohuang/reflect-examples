@@ -44,23 +44,9 @@ type AuthUser struct {
 	Name string
 }
 
-func TestConvert(t *testing.T) {
-	fx(a())
-}
+var ga = giu.NewAdaptor()
 
-func a() interface{} {
-	return "1234"
-}
-
-func fx(a interface{}) {
-	v := reflect.ValueOf(a)
-	fmt.Println(v.Type())
-	fmt.Println(v.Convert(reflect.TypeOf("")).Interface())
-}
-
-func TestUMP(t *testing.T) {
-	ga := giu.NewAdaptor()
-
+func init() {
 	// 注册如何处理成功返回一个值
 	ga.RegisterSuccProcessor(func(c *gin.Context, vs ...interface{}) {
 		if len(vs) == 0 {
@@ -89,7 +75,9 @@ func TestUMP(t *testing.T) {
 	ga.RegisterTypeProcessor(AuthUser{}, func(c *gin.Context, vs ...interface{}) (interface{}, error) {
 		return gor.V0(c.Get("AuthUser")), nil
 	})
+}
 
+func TestUMP(t *testing.T) {
 	resp := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(resp)
 
@@ -306,6 +294,7 @@ func checkBody(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *g
 	assert.Equal(t, http.StatusOK, rr.Code)
 	rsp, _ := json.Marshal(Rsp{State: state, Data: d})
 	body, _ := ioutil.ReadAll(rr.Body)
+
 	assert.Equal(t, string(rsp), strings.TrimSpace(string(body)))
 }
 
@@ -327,6 +316,10 @@ func TestHello(t *testing.T) {
 		return errors.New("xxx")
 	})
 
+	gr.GET("/Get54", func() interface{} {
+		return giu.DirectResponse{Code: 203}
+	})
+
 	rr := performRequest("GET", "/hello/bingoo", router)
 
 	assert.Equal(t, "bingoo", hello)
@@ -340,6 +333,9 @@ func TestHello(t *testing.T) {
 
 	rr = performRequest("GET", "/error", router)
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+
+	rr = performRequest("GET", "/Get54", router)
+	assert.Equal(t, 203, rr.Code)
 }
 
 // from https://github.com/gin-gonic/gin/issues/1120

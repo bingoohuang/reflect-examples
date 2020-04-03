@@ -8,7 +8,6 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/bingoohuang/gor"
@@ -555,12 +554,12 @@ func (a *Adaptor) createArgValue(c *gin.Context, argValuesByTag map[int]string,
 }
 
 func convertValue(singleArgValue string, arg argIn) (reflect.Value, error) {
-	v, err := dealDirectParamArg(singleArgValue, arg.Kind)
+	v, err := gor.CastAny(singleArgValue, arg.Type)
 	if err != nil {
 		return reflect.Value{}, err
 	}
 
-	return convertPtr(arg.Ptr, reflect.ValueOf(v)), nil
+	return convertPtr(arg.Ptr, v), nil
 }
 
 func parseArgIns(ft reflect.Type) []argIn {
@@ -655,20 +654,6 @@ func findTags(t reflect.Type, target reflect.Type) []reflect.StructTag {
 	}
 
 	return tags
-}
-
-func dealDirectParamArg(argValue string, argKind reflect.Kind) (interface{}, error) {
-	switch argKind {
-	case reflect.String:
-		return argValue, nil
-	case reflect.Bool:
-		l := strings.ToLower(argValue)
-		return l == "true" || l == "yes" || l == "on" || l == "1", nil
-	case reflect.Int:
-		return strconv.Atoi(argValue)
-	}
-
-	return nil, fmt.Errorf("unsupported type %v", argKind)
 }
 
 func parseArgs(ft reflect.Type, argIndex int) argIn {
@@ -1042,7 +1027,11 @@ func directResponseProcessor(c *gin.Context, args ...interface{}) (interface{}, 
 		dr.Code = http.StatusOK
 	}
 
-	_ = c.AbortWithError(dr.Code, dr.Error)
+	c.AbortWithStatus(dr.Code)
+
+	if dr.Error != nil {
+		_ = c.Error(dr.Error)
+	}
 
 	return nil, nil
 }

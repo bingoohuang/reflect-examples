@@ -187,8 +187,8 @@ func castTimeDuration(s string, asPtr bool) (reflect.Value, error) {
 func castBool(s string, asPtr bool) (reflect.Value, error) {
 	v, err := strconv.ParseBool(s)
 	if err != nil {
-		s = strings.ToLower(s)
-		if s == "yes" || s == "ok" {
+		switch strings.ToLower(s) {
+		case "yes", "ok", "1", "on":
 			v = true
 			err = nil
 		}
