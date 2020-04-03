@@ -316,9 +316,8 @@ func TestHello(t *testing.T) {
 		return errors.New("xxx")
 	})
 
-	gr.GET("/Get54", func() interface{} {
-		return giu.DirectResponse{Code: 203}
-	})
+	gr.GET("/Get54", func() interface{} { return giu.DirectResponse{Code: 203} })
+	gr.GET("/Get55", func() interface{} { return &giu.DirectResponse{Code: 203} })
 
 	rr := performRequest("GET", "/hello/bingoo", router)
 
@@ -335,6 +334,9 @@ func TestHello(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 
 	rr = performRequest("GET", "/Get54", router)
+	assert.Equal(t, 203, rr.Code)
+
+	rr = performRequest("GET", "/Get55", router)
 	assert.Equal(t, 203, rr.Code)
 }
 

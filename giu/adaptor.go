@@ -72,10 +72,10 @@ func (a *Adaptor) RegisterTypeProcessor(t interface{}, p TypeProcessor) {
 }
 
 func (a *Adaptor) findProcessor(v interface{}) TypeProcessor {
-	target := reflect.TypeOf(v)
+	src := reflect.TypeOf(v)
 
 	for t, p := range a.typeProcessors {
-		if gor.ImplType(t, target) {
+		if gor.ImplType(src, t) {
 			return p
 		}
 	}
@@ -1022,7 +1022,12 @@ type DirectResponse struct {
 
 // directResponseProcessor is the processor for DirectResponse.
 func directResponseProcessor(c *gin.Context, args ...interface{}) (interface{}, error) {
-	dr := args[0].(DirectResponse)
+	dr, ok := args[0].(*DirectResponse)
+	if !ok {
+		arg0 := args[0].(DirectResponse)
+		dr = &arg0
+	}
+
 	if dr.Code == 0 {
 		dr.Code = http.StatusOK
 	}
@@ -1045,8 +1050,13 @@ type DownloadFile struct {
 
 // downloadFileProcessor is the processor for a specified type.
 func downloadFileProcessor(c *gin.Context, args ...interface{}) (interface{}, error) {
-	downloadFile := args[0].(DownloadFile)
-	cd := createContentDisposition(downloadFile)
+	df, ok := args[0].(*DownloadFile)
+	if !ok {
+		arg0 := args[0].(DownloadFile)
+		df = &arg0
+	}
+
+	cd := createContentDisposition(df)
 
 	c.Header("Content-Disposition", cd)
 	c.Header("Content-Description", "File Transfer")
@@ -1056,22 +1066,22 @@ func downloadFileProcessor(c *gin.Context, args ...interface{}) (interface{}, er
 	c.Header("Cache-Control", "must-revalidate")
 	c.Header("Pragma", "public")
 
-	if downloadFile.DiskFile != "" {
-		c.File(downloadFile.DiskFile)
+	if df.DiskFile != "" {
+		c.File(df.DiskFile)
 		return nil, nil
 	}
 
-	_, _ = c.Writer.Write(downloadFile.Content)
+	_, _ = c.Writer.Write(df.Content)
 
 	return nil, nil
 }
 
-func createContentDisposition(downloadFile DownloadFile) string {
+func createContentDisposition(downloadFile *DownloadFile) string {
 	m := map[string]string{"filename": getDownloadFilename(downloadFile)}
 	return mime.FormatMediaType("attachment", m)
 }
 
-func getDownloadFilename(downloadFile DownloadFile) string {
+func getDownloadFilename(downloadFile *DownloadFile) string {
 	filename := downloadFile.Filename
 
 	if filename == "" {

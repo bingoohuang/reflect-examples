@@ -53,12 +53,8 @@ var (
 
 // ImplType tells src whether it implements target type.
 func ImplType(src, target reflect.Type) bool {
-	if src == target {
+	if src == target || src.Kind() == reflect.Ptr && src.Elem() == target {
 		return true
-	}
-
-	if src.Kind() == reflect.Ptr {
-		return src.Implements(target)
 	}
 
 	if target.Kind() != reflect.Interface {
