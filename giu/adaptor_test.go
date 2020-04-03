@@ -44,6 +44,20 @@ type AuthUser struct {
 	Name string
 }
 
+func TestConvert(t *testing.T) {
+	fx(a())
+}
+
+func a() interface{} {
+	return "1234"
+}
+
+func fx(a interface{}) {
+	v := reflect.ValueOf(a)
+	fmt.Println(v.Type())
+	fmt.Println(v.Convert(reflect.TypeOf("")).Interface())
+}
+
 func TestUMP(t *testing.T) {
 	ga := giu.NewAdaptor()
 
@@ -116,7 +130,7 @@ func TestUMP(t *testing.T) {
 	gr.GET("/GetAge4/:name", func(name string, user *AuthUser) string {
 		return user.Name + "/" + name
 	}, giu.Params(giu.URLParams("name")))
-	gr.POST("/SetAge", func(req SetAgeReq) SetAgeRsp {
+	gr.POST("/SetAge", func(req SetAgeReq) interface{} {
 		return SetAgeRsp{Name: fmt.Sprintf("%s:%d", req.Name, req.Age)}
 	})
 
@@ -132,6 +146,7 @@ func TestUMP(t *testing.T) {
 	gr.GET("/Get4", f4)
 	gr.GET("/Get51", f51)
 	gr.GET("/Get52", f52)
+	gr.GET("/Get53/:yes", f53)
 
 	gr.HandleFn(f22)
 
@@ -210,8 +225,16 @@ func f51() giu.DownloadFile {
 	return giu.DownloadFile{DiskFile: "testdata/hello.txt"}
 }
 
-func f52() giu.DownloadFile {
+func f52() interface{} {
 	return giu.DownloadFile{Content: []byte("hello"), Filename: "下载.txt"}
+}
+
+func f53(yes bool) interface{} {
+	if yes {
+		return giu.DownloadFile{Content: []byte("hello"), Filename: "下载.txt"}
+	}
+
+	return "blabla"
 }
 
 func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine) {
@@ -248,6 +271,18 @@ func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context
 	assert.Equal(t, http.StatusOK, resp.Code)
 	body, _ = ioutil.ReadAll(resp.Body)
 	assert.Equal(t, "hello", strings.TrimSpace(string(body)))
+
+	c.Request, _ = http.NewRequest(http.MethodGet, "/Get53/true", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(t, http.StatusOK, resp.Code)
+	body, _ = ioutil.ReadAll(resp.Body)
+	assert.Equal(t, `hello`, strings.TrimSpace(string(body)))
+
+	c.Request, _ = http.NewRequest(http.MethodGet, "/Get53/false", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(t, http.StatusOK, resp.Code)
+	body, _ = ioutil.ReadAll(resp.Body)
+	assert.Equal(t, `{"State":200,"Data":"blabla"}`, strings.TrimSpace(string(body)))
 }
 
 func checkStatusOK(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine, url string, d interface{}) {

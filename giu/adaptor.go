@@ -72,6 +72,18 @@ func (a *Adaptor) RegisterTypeProcessor(t interface{}, p TypeProcessor) {
 	a.typeProcessors[NonPtrTypeOf(t)] = p
 }
 
+func (a *Adaptor) findProcessor(v interface{}) TypeProcessor {
+	target := reflect.TypeOf(v)
+
+	for t, p := range a.typeProcessors {
+		if gor.ImplType(t, target) {
+			return p
+		}
+	}
+
+	return nil
+}
+
 func (a *Adaptor) findTypeProcessor(t reflect.Type) TypeProcessor {
 	for k, v := range a.typeProcessors {
 		if gor.ImplType(t, k) {
@@ -82,13 +94,12 @@ func (a *Adaptor) findTypeProcessor(t reflect.Type) TypeProcessor {
 	return nil
 }
 
-func (a *Adaptor) findTypeProcessorOr(t reflect.Type, defaultProcessor TypeProcessor) TypeProcessor {
-	p := a.findTypeProcessor(t)
-	if p != nil {
+func (a *Adaptor) findTypeProcessorOr(t reflect.Type, processor TypeProcessor) TypeProcessor {
+	if p := a.findTypeProcessor(t); p != nil {
 		return p
 	}
 
-	return defaultProcessor
+	return processor
 }
 
 // succInvoked represents the adaptor is invoked successfully with returned value.
@@ -425,7 +436,7 @@ func (a *Adaptor) succProcess(c *gin.Context, numOut int, r []reflect.Value) {
 	}
 
 	if numOut > 0 {
-		if tp := a.findTypeProcessorOr(r[0].Type(), nil); tp != nil {
+		if tp := a.findProcessor(vs[0]); tp != nil {
 			_, _ = tp(c, vs...)
 			return
 		}
@@ -650,6 +661,9 @@ func dealDirectParamArg(argValue string, argKind reflect.Kind) (interface{}, err
 	switch argKind {
 	case reflect.String:
 		return argValue, nil
+	case reflect.Bool:
+		l := strings.ToLower(argValue)
+		return l == "true" || l == "yes" || l == "on" || l == "1", nil
 	case reflect.Int:
 		return strconv.Atoi(argValue)
 	}
