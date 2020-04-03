@@ -130,13 +130,16 @@ func TestUMP(t *testing.T) {
 	gr.GET("/Get3/:name", f3)
 	gr.GET("/Get31/:name", f31)
 	gr.GET("/Get4", f4)
-	gr.GET("/Get5", f5)
+	gr.GET("/Get51", f51)
+	gr.GET("/Get52", f52)
 
 	gr.HandleFn(f22)
 
 	ga.RegisterInvokeArounder("logrus", &MyInvokeArounderFactory{})
 
 	gr.HandleFn(f{})
+
+	//r.Run(":8080")
 
 	assertResults(t, resp, c, r)
 }
@@ -203,8 +206,12 @@ func f4(name string, age int, _ struct {
 	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 }
 
-func f5() giu.DownloadFile {
+func f51() giu.DownloadFile {
 	return giu.DownloadFile{DiskFile: "testdata/hello.txt"}
+}
+
+func f52() giu.DownloadFile {
+	return giu.DownloadFile{Content: []byte("hello"), Filename: "下载.txt"}
 }
 
 func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine) {
@@ -230,11 +237,17 @@ func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context
 	checkStatusOK(t, resp, c, r, "/MyObject2", "Test")
 	//checkStatusOK(t, resp, c, r, "/Get5", "Test")
 
-	c.Request, _ = http.NewRequest(http.MethodGet, "/Get5", nil)
+	c.Request, _ = http.NewRequest(http.MethodGet, "/Get51", nil)
 	r.ServeHTTP(resp, c.Request)
 	assert.Equal(t, http.StatusOK, resp.Code)
 	body, _ := ioutil.ReadAll(resp.Body)
 	assert.Equal(t, "bingoohuang", strings.TrimSpace(string(body)))
+
+	c.Request, _ = http.NewRequest(http.MethodGet, "/Get52", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(t, http.StatusOK, resp.Code)
+	body, _ = ioutil.ReadAll(resp.Body)
+	assert.Equal(t, "hello", strings.TrimSpace(string(body)))
 }
 
 func checkStatusOK(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine, url string, d interface{}) {
@@ -263,7 +276,6 @@ func checkBody(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *g
 
 func TestHello(t *testing.T) {
 	router := gin.New()
-
 	hello := ""
 	world := ""
 
@@ -288,8 +300,8 @@ func TestHello(t *testing.T) {
 	rr = performRequest("GET", "/world?arg=huang", router)
 
 	assert.Equal(t, "huang", world)
-	bytes, _ := ioutil.ReadAll(rr.Body)
-	assert.Equal(t, `hello huang`, strings.TrimSpace(string(bytes)))
+	content, _ := ioutil.ReadAll(rr.Body)
+	assert.Equal(t, `hello huang`, strings.TrimSpace(string(content)))
 
 	rr = performRequest("GET", "/error", router)
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)

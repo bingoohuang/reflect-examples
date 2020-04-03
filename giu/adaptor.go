@@ -1035,9 +1035,9 @@ func directResponseProcessor(c *gin.Context, args ...interface{}) (interface{}, 
 
 // DownloadFile represents the file to be downloaded.
 type DownloadFile struct {
-	DiskFile    string
-	Filename    string
-	FileContent []byte
+	DiskFile string
+	Filename string
+	Content  []byte
 }
 
 // downloadFileProcessor is the processor for a specified type.
@@ -1058,7 +1058,7 @@ func downloadFileProcessor(c *gin.Context, args ...interface{}) (interface{}, er
 		return nil, nil
 	}
 
-	_, _ = c.Writer.Write(downloadFile.FileContent)
+	_, _ = c.Writer.Write(downloadFile.Content)
 
 	return nil, nil
 }
@@ -1075,9 +1075,9 @@ func getDownloadFilename(downloadFile DownloadFile) string {
 		filename = filepath.Base(downloadFile.DiskFile)
 	}
 
-	if filename != "" {
-		return filename
+	if filename == "" {
+		return "dl"
 	}
 
-	return "downloadFile"
+	return filename
 }
