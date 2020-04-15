@@ -1,9 +1,12 @@
-<p align="center">
-<img 
-    src="img/logo.png"
-    width="500" alt="Golang reflect package examples">
-<br/><br/>
-</p>
+# gor
+
+[![Travis CI](https://img.shields.io/travis/bingoohuang/gor/master.svg?style=flat-square)](https://travis-ci.com/bingoohuang/gor)
+[![Software License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/bingoohuang/gor/blob/master/LICENSE.md)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/bingoohuang/gor)
+[![Coverage Status](http://codecov.io/github/bingoohuang/gor/coverage.svg?branch=master)](http://codecov.io/github/bingoohuang/gor?branch=master)
+[![goreport](https://www.goreportcard.com/badge/github.com/bingoohuang/gor)](https://www.goreportcard.com/report/github.com/bingoohuang/gor)
+
+go reflect collections.
 
 This repository contains a bunch of examples for dealing with the `reflect` package.
 Mainly, for decoding/encoding stuff, and calling functions dynamically.  

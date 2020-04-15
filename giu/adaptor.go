@@ -550,7 +550,7 @@ func (a *Adaptor) createArgValue(c *gin.Context, argValuesByTag map[int]string,
 		return convertValue(singleArgValue, arg)
 	}
 
-	return reflect.Value{}, fmt.Errorf("unable to parse arg%d for %s", arg.Index, arg.Type)
+	return reflect.Zero(arg.Type), nil
 }
 
 func convertValue(singleArgValue string, arg argIn) (reflect.Value, error) {

@@ -318,6 +318,7 @@ func TestHello(t *testing.T) {
 
 	gr.GET("/Get54", func() interface{} { return giu.DirectResponse{Code: 203} })
 	gr.GET("/Get55", func() interface{} { return &giu.DirectResponse{Code: 203} })
+	gr.GET("/Get6", func(id string) string { return "hello " + id })
 
 	rr := performRequest("GET", "/hello/bingoo", router)
 
@@ -338,6 +339,16 @@ func TestHello(t *testing.T) {
 
 	rr = performRequest("GET", "/Get55", router)
 	assert.Equal(t, 203, rr.Code)
+
+	rr = performRequest("GET", "/Get6", router)
+	assert.Equal(t, 200, rr.Code)
+	content, _ = ioutil.ReadAll(rr.Body)
+	assert.Equal(t, `hello`, strings.TrimSpace(string(content)))
+
+	rr = performRequest("GET", "/Get6?id=bingoo", router)
+	assert.Equal(t, 200, rr.Code)
+	content, _ = ioutil.ReadAll(rr.Body)
+	assert.Equal(t, `hello bingoo`, strings.TrimSpace(string(content)))
 }
 
 // from https://github.com/gin-gonic/gin/issues/1120
