@@ -14,7 +14,7 @@ git:
 # .golangci.yml file at the top level of your repo.
 script:
   # Vet examines Go source code and reports suspicious construct
-  - go vet ./...
+  # - go vet ./...
   - go test -race -coverprofile=coverage.txt -covermode=atomic
 
 after_success:
