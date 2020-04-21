@@ -163,7 +163,7 @@ type ginContext struct {
 }
 
 func (g *ginContext) Status(code int) error                { g.Context.Status(code); return nil }
-func (g *ginContext) JSON(code int, obj interface{}) error { g.Context.JSON(code, obj); return nil }
+func (g *ginContext) JSON(code int, obj interface{}) error { Jsonify(g.Context, code, obj); return nil }
 func (g *ginContext) String(code int, format string, values ...interface{}) error {
 	g.Context.String(code, format, values...)
 	return nil

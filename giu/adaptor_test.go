@@ -3,7 +3,6 @@ package giu_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -50,11 +49,11 @@ func init() {
 	// 注册如何处理成功返回一个值
 	ga.RegisterSuccProcessor(func(c *gin.Context, vs ...interface{}) {
 		if len(vs) == 0 {
-			c.JSON(http.StatusOK, Rsp{State: http.StatusOK, Data: "ok"}) // 如何处理无返回(单独error返回除外)
+			giu.Jsonify(c, http.StatusOK, Rsp{State: http.StatusOK, Data: "ok"}) // 如何处理无返回(单独error返回除外)
 		} else if rsp, ok := vs[0].(Rsp); ok { // 返回已经是Rsp类型，不再包装
-			c.JSON(http.StatusOK, rsp)
+			giu.Jsonify(c, http.StatusOK, rsp)
 		} else if len(vs) == 1 {
-			c.JSON(http.StatusOK, Rsp{State: http.StatusOK, Data: vs[0]}) // 选取第一个返回参数，JSON返回
+			giu.Jsonify(c, http.StatusOK, Rsp{State: http.StatusOK, Data: vs[0]}) // 选取第一个返回参数，JSON返回
 		} else {
 			m := make(map[string]interface{})
 
@@ -62,13 +61,13 @@ func init() {
 				m[reflect.TypeOf(v).String()] = v
 			}
 
-			c.JSON(http.StatusOK, m)
+			giu.Jsonify(c, http.StatusOK, m)
 		}
 	})
 
 	// 注册如何处理错误
 	ga.RegisterErrProcessor(func(c *gin.Context, vs ...interface{}) {
-		c.JSON(http.StatusOK, Rsp{State: http.StatusInternalServerError, Data: vs[0].(error).Error()})
+		giu.Jsonify(c, http.StatusOK, Rsp{State: http.StatusInternalServerError, Data: vs[0].(error).Error()})
 	})
 
 	// 注册如何处理AuthUser类型的输入参数
@@ -270,7 +269,7 @@ func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context
 	r.ServeHTTP(resp, c.Request)
 	assert.Equal(t, http.StatusOK, resp.Code)
 	body, _ = ioutil.ReadAll(resp.Body)
-	assert.Equal(t, `{"State":200,"Data":"blabla"}`, strings.TrimSpace(string(body)))
+	assert.Equal(t, `{"state":200,"data":"blabla"}`, strings.TrimSpace(string(body)))
 }
 
 func checkStatusOK(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine, url string, d interface{}) {
@@ -283,7 +282,7 @@ func check(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.E
 func checkBody(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine,
 	method, url string, state int, b interface{}, d interface{}) {
 	if b != nil {
-		bb, _ := json.Marshal(b)
+		bb, _ := giu.JSONMarshal(b)
 		c.Request, _ = http.NewRequest(method, url, bytes.NewReader(bb))
 		c.Request.Header.Set("Content-Type", "application/json; charset=utf-8")
 	} else {
@@ -292,7 +291,7 @@ func checkBody(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *g
 
 	r.ServeHTTP(rr, c.Request)
 	assert.Equal(t, http.StatusOK, rr.Code)
-	rsp, _ := json.Marshal(Rsp{State: state, Data: d})
+	rsp, _ := giu.JSONMarshal(Rsp{State: state, Data: d})
 	body, _ := ioutil.ReadAll(rr.Body)
 
 	assert.Equal(t, string(rsp), strings.TrimSpace(string(body)))
