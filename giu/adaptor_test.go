@@ -67,7 +67,9 @@ func init() {
 
 	// 注册如何处理错误
 	ga.RegisterErrProcessor(func(c *gin.Context, vs ...interface{}) {
-		giu.Jsonify(c, http.StatusOK, Rsp{State: http.StatusInternalServerError, Data: vs[0].(error).Error()})
+		err := vs[0].(error)
+		fmt.Println("IsAdaptorError:", giu.IsAdaptorError(err))
+		giu.Jsonify(c, http.StatusOK, Rsp{State: http.StatusInternalServerError, Data: err.Error()})
 	})
 
 	// 注册如何处理AuthUser类型的输入参数
@@ -381,6 +383,7 @@ func (a *myInvokeArounder) Before(args []interface{}) error {
 }
 
 // After will be called after the adaptee invoking.
-func (a *myInvokeArounder) After(outs []interface{}) {
+func (a *myInvokeArounder) After(outs []interface{}) error {
 	logrus.Debugf("invoke %s after %s with outs %v", a.handlerName, a.Tag, outs)
+	return nil
 }

@@ -71,18 +71,6 @@ func (a *Adaptor) RegisterTypeProcessor(t interface{}, p TypeProcessor) {
 	a.typeProcessors[NonPtrTypeOf(t)] = p
 }
 
-func (a *Adaptor) findProcessor(v interface{}) TypeProcessor {
-	src := reflect.TypeOf(v)
-
-	for t, p := range a.typeProcessors {
-		if gor.ImplType(src, t) {
-			return p
-		}
-	}
-
-	return nil
-}
-
 func (a *Adaptor) findTypeProcessor(t reflect.Type) TypeProcessor {
 	for k, v := range a.typeProcessors {
 		if gor.ImplType(t, k) {
@@ -366,7 +354,9 @@ func (a *Adaptor) internalAdapter(c *gin.Context, fv reflect.Value, option *Opti
 
 	r := fv.Call(argVs)
 
-	_ = around(fa, r, false)
+	if err := around(fa, r, false); err != nil {
+		return err
+	}
 
 	return a.processOut(c, fv, r, option)
 }
@@ -395,9 +385,7 @@ func around(fa InvokeArounder, v []reflect.Value, before bool) error {
 		return fa.Before(args)
 	}
 
-	fa.After(args)
-
-	return nil
+	return fa.After(args)
 }
 
 func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value, option *Option) error {
@@ -435,7 +423,7 @@ func (a *Adaptor) succProcess(c *gin.Context, numOut int, r []reflect.Value) {
 	}
 
 	if numOut > 0 {
-		if tp := a.findProcessor(vs[0]); tp != nil {
+		if tp := a.findTypeProcessor(reflect.TypeOf(vs[0])); tp != nil {
 			_, _ = tp(c, vs...)
 			return
 		}
@@ -553,10 +541,11 @@ func (a *Adaptor) createArgValue(c *gin.Context, argValuesByTag map[int]string,
 	return reflect.Zero(arg.Type), nil
 }
 
-func convertValue(singleArgValue string, arg argIn) (reflect.Value, error) {
-	v, err := gor.CastAny(singleArgValue, arg.Type)
+func convertValue(s string, arg argIn) (reflect.Value, error) {
+	v, err := gor.CastAny(s, arg.Type)
 	if err != nil {
-		return reflect.Value{}, err
+		return reflect.Value{}, &AdaptorError{Err: err,
+			Context: fmt.Sprintf("CastAny %s to %v", s, arg.Type)}
 	}
 
 	return convertPtr(arg.Ptr, v), nil
@@ -667,6 +656,18 @@ func parseArgs(ft reflect.Type, argIndex int) argIn {
 	return argIn{Index: argIndex, Type: argType, Kind: argType.Kind(), Ptr: ptr, PrimitiveIndex: -1}
 }
 
+// AdaptorError defines the error generated in the processing of adaptor.
+type AdaptorError struct {
+	Err     error
+	Context string
+}
+
+// Error returns the error message.
+func (e *AdaptorError) Error() string { return e.Context + " " + e.Err.Error() }
+
+//  IsAdaptorError tells the err is an AdaptorError or not.
+func IsAdaptorError(err error) bool { _, ok := err.(*AdaptorError); return ok }
+
 func (a *Adaptor) processStruct(c *gin.Context, arg argIn) (reflect.Value, error) {
 	if arg.Ptr && arg.Type == NonPtrTypeOf(c) { // 直接注入gin.Context
 		return reflect.ValueOf(c), nil
@@ -687,7 +688,7 @@ func (a *Adaptor) processStruct(c *gin.Context, arg argIn) (reflect.Value, error
 
 	argValue := reflect.New(arg.Type)
 	if err := c.ShouldBind(argValue.Interface()); err != nil {
-		return reflect.Value{}, err
+		return reflect.Value{}, &AdaptorError{Err: err, Context: "ShouldBind"}
 	}
 
 	return argValue, nil
@@ -1011,7 +1012,7 @@ type InvokeArounder interface {
 	Before(args []interface{}) error
 
 	// After will be called after the adaptee invoking.
-	After(outs []interface{})
+	After(outs []interface{}) error
 }
 
 // DirectResponse represents the direct response.
