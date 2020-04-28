@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -321,43 +323,87 @@ func TestHello(t *testing.T) {
 	gr.GET("/Get55", func() interface{} { return &giu.DirectResponse{Code: 203} })
 	gr.GET("/Get6", func(id string) string { return "hello " + id })
 
-	rr := performRequest("GET", "/hello/bingoo", router)
+	rr := PerformRequest("GET", "/hello/bingoo", router)
 
 	assert.Equal(t, "bingoo", hello)
 	assert.Equal(t, gor.V([]byte{}, nil), gor.V(ioutil.ReadAll(rr.Body)))
 
-	rr = performRequest("GET", "/world?arg=huang", router)
+	rr = PerformRequest("GET", "/world?arg=huang", router)
 
 	assert.Equal(t, "huang", world)
 	content, _ := ioutil.ReadAll(rr.Body)
 	assert.Equal(t, `hello huang`, strings.TrimSpace(string(content)))
 
-	rr = performRequest("GET", "/error", router)
+	rr = PerformRequest("GET", "/error", router)
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 
-	rr = performRequest("GET", "/Get54", router)
+	rr = PerformRequest("GET", "/Get54", router)
 	assert.Equal(t, 203, rr.Code)
 
-	rr = performRequest("GET", "/Get55", router)
+	rr = PerformRequest("GET", "/Get55", router)
 	assert.Equal(t, 203, rr.Code)
 
-	rr = performRequest("GET", "/Get6", router)
+	rr = PerformRequest("GET", "/Get6", router)
 	assert.Equal(t, 200, rr.Code)
 	content, _ = ioutil.ReadAll(rr.Body)
 	assert.Equal(t, `hello`, strings.TrimSpace(string(content)))
 
-	rr = performRequest("GET", "/Get6?id=bingoo", router)
+	rr = PerformRequest("GET", "/Get6?id=bingoo", router)
 	assert.Equal(t, 200, rr.Code)
 	content, _ = ioutil.ReadAll(rr.Body)
 	assert.Equal(t, `hello bingoo`, strings.TrimSpace(string(content)))
 }
 
+type RequestVars struct {
+	Body        io.Reader
+	ContentType string
+}
+
+type RequestVarsFn func(r *RequestVars)
+
+func JSONString(s string) RequestVarsFn {
+	return func(r *RequestVars) {
+		r.Body = strings.NewReader(s)
+		r.ContentType = "application/json; charset=utf-8"
+	}
+}
+
+func JSONObject(obj interface{}) RequestVarsFn {
+	return func(r *RequestVars) {
+		b, _ := giu.JSONMarshal(obj)
+		r.Body = bytes.NewReader(b)
+		r.ContentType = "application/json; charset=utf-8"
+	}
+}
+
 // from https://github.com/gin-gonic/gin/issues/1120
-func performRequest(method, target string, router *gin.Engine) *httptest.ResponseRecorder {
-	r := httptest.NewRequest(method, target, nil)
+func PerformRequest(method, target string, router *gin.Engine, fns ...RequestVarsFn) *httptest.ResponseRecorder {
+	vars := &RequestVars{}
+
+	for _, fn := range fns {
+		fn(vars)
+	}
+
+	r := httptest.NewRequest(method, target, vars.Body)
+
+	if vars.ContentType != "" {
+		r.Header.Set("Content-Type", vars.ContentType)
+	}
+
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
+
 	return w
+}
+
+// ExistsAsFile tests a name is representing an existing file.
+func ExistsAsFile(name string) bool {
+	stat, err := os.Stat(name)
+	if err != nil {
+		return false
+	}
+
+	return !stat.IsDir()
 }
 
 // InvokeArounderFactory defines the factory to create InvokeArounder

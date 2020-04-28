@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/bingoohuang/gor"
 	"github.com/gin-gonic/gin"
 	"github.com/julienschmidt/httprouter"
@@ -222,11 +224,15 @@ func findStateCode(vs []interface{}) (int, []interface{}) {
 
 func defaultErrorProcessor(g *gin.Context, vs ...interface{}) (interface{}, error) {
 	code := 500
+	err := vs[0].(error)
+
+	logrus.Warnf("error occurred %+v", err)
+
 	if sce, ok := vs[0].(StateCodeError); ok {
 		code = sce.GetStateCode()
 	}
 
-	_ = g.AbortWithError(code, vs[0].(error))
+	_ = g.AbortWithError(code, err)
 
 	return nil, nil
 }
