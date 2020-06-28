@@ -5,10 +5,10 @@ import (
 	"unsafe"
 )
 
-// nolint gochecknoglobals
+// nolint:gochecknoglobals
 var offset uintptr
 
-// nolint gochecknoinits
+// nolint:gochecknoinits
 func init() {
 	field, ok := reflect.ValueOf(reflect.Value{}).Type().FieldByName("flag")
 	if !ok {

@@ -68,7 +68,7 @@ type PointerWalker interface {
 //   - Struct: skips all fields from being walked
 //   - StructField: skips walking the struct value
 //
-var ErrSkipEntry = errors.New("skip this entry") // nolint
+var ErrSkipEntry = errors.New("skip this entry")
 
 // Walk takes an arbitrary value and an interface and traverses the
 // value, calling callbacks on the interface if they are supported.
@@ -93,7 +93,7 @@ func Walk(data, walker interface{}) (err error) {
 	return
 }
 
-// nolint gocognit
+// nolint:gocognit
 func walk(v reflect.Value, w interface{}) (err error) {
 	// Determine if we're receiving a pointer and if so notify the walker.
 	// The logic here is convoluted but very important (tests will fail if
@@ -187,7 +187,7 @@ func walk(v reflect.Value, w interface{}) (err error) {
 	}
 }
 
-// nolint gocognit
+// nolint:gocognit
 func walkMap(v reflect.Value, w interface{}) error {
 	ew, ewok := w.(EnterExitWalker)
 	if ewok {
@@ -312,7 +312,7 @@ func walkSlice(v reflect.Value, w interface{}) (err error) {
 	return nil
 }
 
-// nolint gocognit
+// nolint:gocognit
 func walkStruct(v reflect.Value, w interface{}) (err error) {
 	ew, ewok := w.(EnterExitWalker)
 	if ewok {

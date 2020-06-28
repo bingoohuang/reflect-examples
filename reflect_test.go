@@ -15,7 +15,7 @@ type t int // A type definition
 func (r t) Twice() t       { return r * 2 }
 func (r t) Half() t        { return r / 2 }
 func (r t) Less(r2 t) bool { return r < r2 }
-func (r t) privateMethod() {} // nolint unused
+func (r t) privateMethod() {} // nolint:unused
 
 type FooService interface {
 	Foo1(x int) int

@@ -475,7 +475,7 @@ func Map(s interface{}, optionFns ...OptionFn) map[string]interface{} {
 // MapString converts the given struct to a map[string]string. For more info
 // refer to Struct types Map() method. It panics if s's kind is not struct.
 func MapString(s interface{}, optionFns ...OptionFn) map[string]string {
-	fns := make([]OptionFn, 0, len(optionFns)+1) // nolint gomnd
+	fns := make([]OptionFn, 0, len(optionFns)+1) // nolint:gomnd
 	fns = append(fns, optionFns...)
 	fns = append(fns, Stringer(true))
 

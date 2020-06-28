@@ -1,4 +1,3 @@
-// nolint gomnd
 package sudo_test
 
 import (

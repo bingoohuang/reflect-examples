@@ -11,7 +11,7 @@ type deepCopier struct {
 	pointers map[unsafe.Pointer]interface{}
 }
 
-// nolint funlen
+// nolint:funlen
 func (c *deepCopier) deepCopy(i interface{}) interface{} {
 	if i == nil {
 		return nil

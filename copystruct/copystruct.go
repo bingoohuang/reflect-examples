@@ -277,14 +277,14 @@ func (dc *CopyStruct) parseDstFieldName(srcFieldName string, reversed bool,
 }
 
 // parseTagOptions parses deepcopier tag field and returns context.
-// nolint gomnd
+// nolint:gomnd
 func parseTagOptions(value string) tagOptions {
 	options := tagOptions{}
 
 	for _, opt := range strings.Split(value, ";") {
 		o := strings.SplitN(opt, ":", 2)
 
-		switch len(o) { // nolint gomnd
+		switch len(o) { // nolint:gomnd
 		case 1: // copystruct:"keyword; without; value;"
 			options[o[0]] = ""
 		case 2: // copystruct:"key:value; anotherkey:anothervalue"

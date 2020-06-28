@@ -2,7 +2,7 @@ package validate
 
 import "regexp"
 
-// nolint lll
+// nolint:lll
 const (
 	alphaRegexString                 = "^[a-zA-Z]+$"
 	alnumRegexString                 = "^[a-zA-Z0-9]+$"
@@ -43,7 +43,7 @@ const (
 	postcodeRegexString              = `^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([A-Za-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9]?[A-Za-z])))) [0-9][A-Za-z]{2})$` //https://stackoverflow.com/questions/164979/regex-for-matching-uk-postcodes/51885364#51885364
 )
 
-// nolint gochecknoglobals
+// nolint:gochecknoglobals
 var (
 	alphaRegex                 = regexp.MustCompile(alphaRegexString)
 	alnumRegex                 = regexp.MustCompile(alnumRegexString)

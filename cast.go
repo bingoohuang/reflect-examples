@@ -132,13 +132,13 @@ func parseStruct(fieldType reflect.Type, tag string, ptr bool, field reflect.Val
 // Caster defines the function prototype for cast string a any type.
 type Caster func(s string, asPtr bool) (reflect.Value, error)
 
-// nolint gochecknoglobals
+// nolint:gochecknoglobals
 var (
 	invalidValue = reflect.Value{}
 )
 
 // casters defines default for basic types.
-// nolint gochecknoglobals
+// nolint:gochecknoglobals
 var casters = map[reflect.Type]Caster{
 	reflect.TypeOf(false):            castBool,
 	reflect.TypeOf(float32(0)):       castFloat32,

@@ -15,7 +15,7 @@ type FormatTest struct {
 	Result bool
 }
 
-// nolint funlen
+// nolint:funlen
 func getFormatTestGroups() []FormatTestGroup {
 	return []FormatTestGroup{
 		{

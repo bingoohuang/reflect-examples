@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// nolint gomnd
+// nolint:gomnd
 func TestPopulate(t *testing.T) {
 	prop := map[string]string{
 		"key1":        "value1",

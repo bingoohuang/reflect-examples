@@ -1,5 +1,5 @@
 // Package validate ...
-// nolint lll
+// nolint:lll
 /*
 Package validate validates Go structs and types recursively based on tags.
 It provides powerful syntax to perform validation for substructs, maps, slices, arrays, and pointers.

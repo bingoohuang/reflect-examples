@@ -30,7 +30,7 @@ func (r JSON) WriteContentType(w http.ResponseWriter) {
 	writeContentType(w, jsonContentType)
 }
 
-// nolint gochecknoinits
+// nolint:gochecknoinits
 func init() {
 	extra.SetNamingStrategy(strcase.ToCamelLower)
 }

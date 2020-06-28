@@ -10,7 +10,7 @@ import (
 type Type string
 
 // Following validators are available.
-// nolint lll
+// nolint:lll
 const (
 	// Eq (equals) compares a numeric value of a number or compares a count of elements in a string, a map, a slice, or an array.
 	// E.g. `validate:"eq=1"`
@@ -76,7 +76,7 @@ type validator struct {
 	Value string
 }
 
-// nolint dupl
+// nolint:dupl
 func validateEq(value reflect.Value, validator string) ErrorField {
 	kind := value.Kind()
 	typ := value.Type()
@@ -133,7 +133,7 @@ func validateEq(value reflect.Value, validator string) ErrorField {
 	return nil
 }
 
-// nolint dupl
+// nolint:dupl
 func validateNe(value reflect.Value, validator string) ErrorField {
 	kind := value.Kind()
 	typ := value.Type()
@@ -190,7 +190,7 @@ func validateNe(value reflect.Value, validator string) ErrorField {
 	return nil
 }
 
-// nolint dupl
+// nolint:dupl
 func validateGt(value reflect.Value, validator string) ErrorField {
 	kind := value.Kind()
 	typ := value.Type()
@@ -247,7 +247,7 @@ func validateGt(value reflect.Value, validator string) ErrorField {
 	return nil
 }
 
-// nolint dupl
+// nolint:dupl
 func validateLt(value reflect.Value, validator string) ErrorField {
 	kind := value.Kind()
 	typ := value.Type()
@@ -304,7 +304,7 @@ func validateLt(value reflect.Value, validator string) ErrorField {
 	return nil
 }
 
-// nolint dupl
+// nolint:dupl
 func validateGte(value reflect.Value, validator string) ErrorField {
 	kind := value.Kind()
 	typ := value.Type()
@@ -361,7 +361,7 @@ func validateGte(value reflect.Value, validator string) ErrorField {
 	return nil
 }
 
-// nolint dupl
+// nolint:dupl
 func validateLte(value reflect.Value, validator string) ErrorField {
 	kind := value.Kind()
 	typ := value.Type()
@@ -490,7 +490,7 @@ func validateNil(value reflect.Value, validator string) ErrorField {
 	return nil
 }
 
-// nolint gocognit
+// nolint:gocognit
 func validateOneOf(value reflect.Value, validator string) ErrorField {
 	kind := value.Kind()
 	typ := value.Type()

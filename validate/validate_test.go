@@ -1,4 +1,4 @@
-// nolint gomnd
+// nolint:gomnd
 package validate
 
 import (

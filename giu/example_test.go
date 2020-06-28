@@ -14,7 +14,7 @@ type Name struct {
 	Name string `json:"name"`
 }
 
-// nolint gochecknoinits
+// nolint:gochecknoinits
 func init() {
 	lo.SetupLog()
 }

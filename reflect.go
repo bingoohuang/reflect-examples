@@ -45,7 +45,7 @@ func IndirectAll(v reflect.Value) reflect.Value {
 }
 
 // 参考 https://github.com/uber-go/dig/blob/master/types.go
-// nolint gochecknoglobals
+// nolint:gochecknoglobals
 var (
 	// ErrType defines the error's type
 	ErrType = reflect.TypeOf((*error)(nil)).Elem()

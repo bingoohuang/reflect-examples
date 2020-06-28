@@ -95,7 +95,7 @@ func (a *Adaptor) findTypeProcessorOr(t reflect.Type, processor TypeProcessor) T
 type succInvoked interface{ succInvoked() }
 
 // SuccInvokedType defines the successfully adaptor invoke's type.
-// nolint gochecknoglobals
+// nolint:gochecknoglobals
 var SuccInvokedType = reflect.TypeOf((*succInvoked)(nil)).Elem()
 
 // NonPtrTypeOf returns the non-ptr type of v.
@@ -170,7 +170,7 @@ func defaultSuccProcessorInternal(g responder, vs ...interface{}) error {
 		return err
 	}
 
-	if len(vs) == 1 { // nolint gomnd
+	if len(vs) == 1 {
 		return respondOut1(g, vs, code)
 	}
 
@@ -402,7 +402,7 @@ func (a *Adaptor) processOut(c *gin.Context, fv reflect.Value, r []reflect.Value
 		return nil
 	}
 
-	if gor.AsError(ft.Out(numOut - 1)) { // nolint gomnd
+	if gor.AsError(ft.Out(numOut - 1)) { // nolint:gomnd
 		if !r[numOut-1].IsNil() {
 			return r[numOut-1].Interface().(error)
 		}
@@ -479,16 +479,16 @@ func (a *Adaptor) createArgs(c *gin.Context, fv reflect.Value, option *Option) (
 }
 
 func singlePrimitiveValue(c *gin.Context, primitiveArgsNum int) string {
-	if primitiveArgsNum != 1 { // nolint gomnd
+	if primitiveArgsNum != 1 { // nolint:gomnd
 		return ""
 	}
 
-	if len(c.Params) == 1 { // nolint gomnd
+	if len(c.Params) == 1 { // nolint:gomnd
 		return c.Params[0].Value
 	}
 
 	q := c.Request.URL.Query()
-	if len(q) == 1 { // nolint gomnd
+	if len(q) == 1 { // nolint:gomnd
 		for _, v := range q {
 			return v[0]
 		}
@@ -956,7 +956,7 @@ func (a *Routes) parseMethodRelativePath(url string) ([]string, bool, string) {
 	urlFields := strings.Fields(url)
 
 	// 没有定义HTTP METHOD，当做ANY
-	if len(urlFields) == 1 { // nolint gomnd
+	if len(urlFields) == 1 { // nolint:gomnd
 		return []string{anyMethod}, true, urlFields[0]
 	}
 
@@ -988,7 +988,7 @@ func (a *Routes) parseMethodRelativePath(url string) ([]string, bool, string) {
 
 // Use adds middleware, see example code.
 func (a *Routes) Use(h HandlerFunc, optionFns ...OptionFn) IRoutes {
-	fns := make([]OptionFn, len(optionFns)+1) // nolint gomnd
+	fns := make([]OptionFn, len(optionFns)+1) // nolint:gomnd
 	copy(fns, optionFns)
 	fns[len(optionFns)] = MiddleWare(true)
 	a.GinRouter.Use(a.Adaptor.Adapt(h, fns...))
@@ -1003,7 +1003,7 @@ type T interface{ t() }
 
 var (
 	// TType defines the type of T.
-	TType = reflect.TypeOf((*T)(nil)).Elem() // nolint gochecknoglobals
+	TType = reflect.TypeOf((*T)(nil)).Elem() // nolint:gochecknoglobals
 )
 
 // InvokeArounderFactory defines the factory to create InvokeArounder

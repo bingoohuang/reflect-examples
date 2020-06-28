@@ -1,5 +1,5 @@
 // Package gor ...
-// nolint gomnd
+// nolint:gomnd
 package gor
 
 import (

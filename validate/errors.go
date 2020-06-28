@@ -1,5 +1,5 @@
 // Package validate ...
-// nolint lll
+// nolint:lll
 package validate
 
 import (

@@ -1,5 +1,5 @@
 // Package validate ...
-// nolint gomnd
+// nolint:gomnd
 package validate
 
 import (

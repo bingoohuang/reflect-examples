@@ -9,7 +9,7 @@ import (
 // That way your data will be fetch in the minimal amount memory access. The
 // example only packs 2 slice but this can easilly be extended to more then 2
 // slice or even to other pointers to any structs or any combination of these.
-func ExampleMemoryPacking() { // nolint funlen
+func ExampleMemoryPacking() { // nolint:funlen
 	mem0, mem1 := []int{1, 2, 3}, []float64{4, 5, 6, 7}
 	sizeElem0 := unsafe.Sizeof(mem0[0]) // sizeof(int)
 	sizeElem1 := unsafe.Sizeof(mem1[0]) // sizeof(float64)

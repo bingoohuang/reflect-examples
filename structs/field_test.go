@@ -1,4 +1,4 @@
-// nolint gomnd
+// nolint:gomnd
 package structs
 
 import (

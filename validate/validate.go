@@ -64,7 +64,7 @@ func createOption(optionFns []OptionFn) (*Option, error) {
 }
 
 // validateField validates a struct field
-// nolint gocognit
+// nolint:gocognit
 func (o *Option) validateField(value reflect.Value, fieldName string, validators string) error {
 	kind := value.Kind()
 
@@ -193,7 +193,7 @@ func (o *Option) getValidators(tag reflect.StructTag) string {
 }
 
 // splitValidators splits validators into key validators, value validators and remaning validators of the next level
-// nolint nakedret
+// nolint:nakedret
 func splitValidators(validators string) (keyValidators string, valValidators string, remaningValidators string, err ErrorField) {
 	gt := 0
 	bracket := 0
@@ -316,7 +316,7 @@ func parseValidators(validators string) (validatorsOr [][]validator, err ErrorFi
 
 			v := ""
 
-			if len(entries) == 2 { // nolint gomnd
+			if len(entries) == 2 { // nolint:gomnd
 				v = regexpValue.FindString(entries[1])
 			}
 
