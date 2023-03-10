@@ -145,7 +145,6 @@ func formatCIDRv4(value string) bool {
 
 // formatCIDRv6 is the validation function for validating if the field's value is a valid v6 CIDR address.
 func formatCIDRv6(value string) bool {
-
 	ip, _, err := net.ParseCIDR(value)
 
 	return err == nil && ip.To4() == nil
@@ -481,7 +480,6 @@ func formatUrnRFC2141(value string) bool {
 	_, match := urn.Parse([]byte(value))
 
 	return match
-
 }
 
 // formatFile is the validation function for validating if the current field's value is a valid file path.

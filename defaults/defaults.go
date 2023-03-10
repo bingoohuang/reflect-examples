@@ -194,6 +194,7 @@ func convertInt8(t reflect.Type, v string) (reflect.Value, error) {
 
 	return reflect.ValueOf(int8(val)).Convert(t), nil
 }
+
 func convertInt16(t reflect.Type, v string) (reflect.Value, error) {
 	val, err := strconv.ParseInt(v, 10, 16)
 	if err != nil {
@@ -202,6 +203,7 @@ func convertInt16(t reflect.Type, v string) (reflect.Value, error) {
 
 	return reflect.ValueOf(int16(val)).Convert(t), nil
 }
+
 func convertInt32(t reflect.Type, v string) (reflect.Value, error) {
 	val, err := strconv.ParseInt(v, 10, 32)
 	if err != nil {

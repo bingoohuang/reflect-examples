@@ -10,7 +10,6 @@ import (
 
 // Validator is an interface for a validated struct.
 type Validator interface {
-
 	// Validate is a custom validation function.
 	// Validate does not work when the receiver is a reference.
 	// Validate does not work for nested types obtained from unexported field.
@@ -32,13 +31,13 @@ func TagName(tagName string) OptionFn { return func(o *Option) { o.TagName = tag
 // It accepts a struct or a struct pointer as a parameter.
 // It returns an error if a struct does not validate or nil if there are no validation errors.
 //
-//  err := validate.Validate(struct {
-//  	field time.Duration `validate:"gte=0s"`
-//  }{
-//  	field: -time.Second,
-//  })
+//	err := validate.Validate(struct {
+//		field time.Duration `validate:"gte=0s"`
+//	}{
+//		field: -time.Second,
+//	})
 //
-//  // err contains an error
+//	// err contains an error
 func Validate(element interface{}, optionFns ...OptionFn) error {
 	option, err := createOption(optionFns)
 	if err != nil {

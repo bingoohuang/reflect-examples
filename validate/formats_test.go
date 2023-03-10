@@ -151,7 +151,8 @@ func getFormatTestGroups() []FormatTestGroup {
 				{"+99.9", false},
 				{"108", false},
 			},
-		}, {
+		},
+		{
 			FormatDataURI, []FormatTest{
 				{"data:image/png;base64,TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4=", true},
 				{"data:text/plain;base64,Vml2YW11cyBmZXJtZW50dW0gc2VtcGVyIHBvcnRhLg==", true},
@@ -277,7 +278,8 @@ func getFormatTestGroups() []FormatTestGroup {
 				{"3 423 21412 0", true},
 				{"3 401 01319 X", true},
 			},
-		}, {
+		},
+		{
 			FormatBase64, []FormatTest{
 				{"dW5pY29ybg==", true},
 				{"dGhpIGlzIGEgdGVzdCBiYXNlNjQ=", true},

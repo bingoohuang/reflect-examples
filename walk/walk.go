@@ -67,7 +67,6 @@ type PointerWalker interface {
 //
 //   - Struct: skips all fields from being walked
 //   - StructField: skips walking the struct value
-//
 var ErrSkipEntry = errors.New("skip this entry")
 
 // Walk takes an arbitrary value and an interface and traverses the

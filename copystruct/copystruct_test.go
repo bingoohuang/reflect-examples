@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/bingoohuang/gor/copystruct"
-
 	"github.com/guregu/null"
 	"github.com/lib/pq"
 	uuid "github.com/satori/go.uuid"
@@ -770,7 +769,7 @@ func TestNullableType(t *testing.T) {
 
 	// Same type: value -- copy to
 	{
-		src := &Value{UUID: uuid.NewV4()}
+		src := &Value{UUID: func() uuid.UUID { uid, _ := uuid.NewV4(); return uid }()}
 		dst := &Value{}
 		assert.Nil(t, copystruct.Copy(src).To(dst))
 		assert.Equal(t, src.UUID, dst.UUID)
@@ -779,14 +778,14 @@ func TestNullableType(t *testing.T) {
 	// Same type: value -- copy from
 	{
 		src := &Value{}
-		from := &Value{UUID: uuid.NewV4()}
+		from := &Value{UUID: func() uuid.UUID { uid, _ := uuid.NewV4(); return uid }()}
 		assert.Nil(t, copystruct.Copy(src).From(from))
 		assert.Equal(t, from.UUID, src.UUID)
 	}
 
 	// Same type: pointer -- copy to
 	{
-		uid := uuid.NewV4()
+		uid, _ := uuid.NewV4()
 		src := &Ptr{UUID: &uid}
 		dst := &Ptr{}
 		assert.Nil(t, copystruct.Copy(src).To(dst))
@@ -795,7 +794,7 @@ func TestNullableType(t *testing.T) {
 
 	// Same type: pointer -- copy from
 	{
-		uid := uuid.NewV4()
+		uid := func() uuid.UUID { uid, _ := uuid.NewV4(); return uid }()
 		src := &Ptr{}
 		from := &Ptr{UUID: &uid}
 		assert.Nil(t, copystruct.Copy(src).From(from))
@@ -804,7 +803,7 @@ func TestNullableType(t *testing.T) {
 
 	// Value to value -- copy to
 	{
-		src := &Value{UUID: uuid.NewV4()}
+		src := &Value{UUID: func() uuid.UUID { uid, _ := uuid.NewV4(); return uid }()}
 		dst := &FromNullable{}
 		assert.Nil(t, copystruct.Copy(src).To(dst))
 		assert.Equal(t, src.UUID.String(), dst.UUID)
@@ -813,14 +812,14 @@ func TestNullableType(t *testing.T) {
 	// Value to value -- copy from
 	{
 		src := &FromNullable{}
-		from := &ToString{UUID: uuid.NewV4()}
+		from := &ToString{UUID: func() uuid.UUID { uid, _ := uuid.NewV4(); return uid }()}
 		assert.Nil(t, copystruct.Copy(src).From(from))
 		assert.Equal(t, from.UUID.String(), src.UUID)
 	}
 
 	// Value to pointer -- copy to
 	{
-		src := &ToString{UUID: uuid.NewV4()}
+		src := &ToString{UUID: func() uuid.UUID { uid, _ := uuid.NewV4(); return uid }()}
 		dst := &PtrFromNullable{}
 		assert.Nil(t, copystruct.Copy(src).To(dst))
 		assert.Equal(t, src.UUID.String(), *dst.UUID)
@@ -829,14 +828,14 @@ func TestNullableType(t *testing.T) {
 	// Value to pointer -- copy from
 	{
 		src := &PtrFromNullable{}
-		from := &ToString{UUID: uuid.NewV4()}
+		from := &ToString{UUID: func() uuid.UUID { uid, _ := uuid.NewV4(); return uid }()}
 		assert.Nil(t, copystruct.Copy(src).From(from))
 		assert.Equal(t, from.UUID.String(), *src.UUID)
 	}
 
 	// Pointer to value -- copy to
 	{
-		uid := uuid.NewV4()
+		uid := func() uuid.UUID { uid, _ := uuid.NewV4(); return uid }()
 		src := &PtrToString{UUID: &uid}
 		dst := &FromNullable{}
 		assert.Nil(t, copystruct.Copy(src).To(dst))
@@ -845,7 +844,7 @@ func TestNullableType(t *testing.T) {
 
 	// Pointer to value -- copy from
 	{
-		uid := uuid.NewV4()
+		uid := func() uuid.UUID { uid, _ := uuid.NewV4(); return uid }()
 		src := &FromNullable{}
 		from := &PtrToString{UUID: &uid}
 		assert.Nil(t, copystruct.Copy(src).From(from))

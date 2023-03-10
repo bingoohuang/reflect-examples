@@ -201,7 +201,8 @@ func (dc *CopyStruct) copyFields(srcValue, dstValue reflect.Value, f string, dst
 }
 
 func setFieldValue(srcFieldType reflect.Type, dstFieldType reflect.Type,
-	dstFieldValue, srcFieldValue reflect.Value, tagOptions tagOptions) bool {
+	dstFieldValue, srcFieldValue reflect.Value, tagOptions tagOptions,
+) bool {
 	if srcFieldType.AssignableTo(dstFieldType) {
 		dstFieldValue.Set(srcFieldValue)
 		return true
@@ -216,7 +217,8 @@ func setFieldValue(srcFieldType reflect.Type, dstFieldType reflect.Type,
 }
 
 func processNullableTypeValuer2Ptr(srcFieldVal, dstFieldVal reflect.Value,
-	dstStructField reflect.StructField, tagOptions tagOptions) {
+	dstStructField reflect.StructField, tagOptions tagOptions,
+) {
 	// We have same nullable type on both sides
 	if setFieldValue(srcFieldVal.Type(), dstStructField.Type, dstFieldVal, srcFieldVal, tagOptions) {
 		return
@@ -236,7 +238,8 @@ func processNullableTypeValuer2Ptr(srcFieldVal, dstFieldVal reflect.Value,
 }
 
 func processNullableTypeValuer2Value(srcFieldValue, dstFieldValue reflect.Value,
-	dstFieldType reflect.StructField, force bool, tagOptions tagOptions) {
+	dstFieldType reflect.StructField, force bool, tagOptions tagOptions,
+) {
 	// We have same nullable type on both sides
 	if setFieldValue(srcFieldValue.Type(), dstFieldType.Type, dstFieldValue, srcFieldValue, tagOptions) {
 		return
@@ -257,7 +260,8 @@ func processNullableTypeValuer2Value(srcFieldValue, dstFieldValue reflect.Value,
 }
 
 func (dc *CopyStruct) parseDstFieldName(srcFieldName string, reversed bool,
-	srcStructField reflect.StructField, dst interface{}) (string, tagOptions) {
+	srcStructField reflect.StructField, dst interface{},
+) (string, tagOptions) {
 	dstFieldName := srcFieldName
 
 	if reversed {

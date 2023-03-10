@@ -28,7 +28,6 @@ func ExampleNew() {
 	// Name        : Server
 	// Values      : [Arslan 123456 true]
 	// Value of ID : 123456
-
 }
 
 func ExampleMap() {
@@ -53,7 +52,6 @@ func ExampleMap() {
 	// "Arslan"
 	// 123456
 	// true
-
 }
 
 func ExampleMap_tags() {
@@ -79,7 +77,6 @@ func ExampleMap_tags() {
 	// "Zeynep"
 	// 789012
 	// false
-
 }
 
 func ExampleMap_omitNested() {
@@ -292,7 +289,6 @@ func ExampleField() {
 
 	// Output:
 	// Value of Person.Access.Name: fatih
-
 }
 
 func ExampleIsZero() {

@@ -10,11 +10,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/bingoohuang/gor"
 	"github.com/gin-gonic/gin"
 	"github.com/julienschmidt/httprouter"
+	"github.com/sirupsen/logrus"
 )
 
 // TypeProcessor is the processor for a specified type.
@@ -61,11 +60,10 @@ func (a *Adaptor) RegisterErrProcessor(p Processor) {
 
 // RegisterSuccProcessor typeProcessors a type processor for the successful deal.
 func (a *Adaptor) RegisterSuccProcessor(p Processor) {
-	a.typeProcessors[NonPtrTypeOf(SuccInvokedType)] =
-		func(c *gin.Context, args ...interface{}) (interface{}, error) {
-			p(c, args...)
-			return nil, nil
-		}
+	a.typeProcessors[NonPtrTypeOf(SuccInvokedType)] = func(c *gin.Context, args ...interface{}) (interface{}, error) {
+		p(c, args...)
+		return nil, nil
+	}
 }
 
 // RegisterTypeProcessor typeProcessors a type processor for the type.
@@ -513,7 +511,8 @@ func (t ArgsTags) countPrimitiveArgs(argIns []argIn) int {
 }
 
 func (a *Adaptor) createArgValue(c *gin.Context, argValuesByTag map[int]string,
-	argAsTags ArgsTags, arg argIn, singleArgValue string, option *Option) (reflect.Value, error) {
+	argAsTags ArgsTags, arg argIn, singleArgValue string, option *Option,
+) (reflect.Value, error) {
 	if _, ok := argAsTags[arg.Index]; ok {
 		return convertPtr(arg.Ptr, reflect.New(arg.Type)), nil
 	}
@@ -550,8 +549,10 @@ func (a *Adaptor) createArgValue(c *gin.Context, argValuesByTag map[int]string,
 func convertValue(s string, arg argIn) (reflect.Value, error) {
 	v, err := gor.CastAny(s, arg.Type)
 	if err != nil {
-		return reflect.Value{}, &AdaptorError{Err: err,
-			Context: fmt.Sprintf("CastAny %s to %v", s, arg.Type)}
+		return reflect.Value{}, &AdaptorError{
+			Err:     err,
+			Context: fmt.Sprintf("CastAny %s to %v", s, arg.Type),
+		}
 	}
 
 	return convertPtr(arg.Ptr, v), nil
@@ -671,7 +672,7 @@ type AdaptorError struct {
 // Error returns the error message.
 func (e *AdaptorError) Error() string { return e.Context + " " + e.Err.Error() }
 
-//  IsAdaptorError tells the err is an AdaptorError or not.
+// IsAdaptorError tells the err is an AdaptorError or not.
 func IsAdaptorError(err error) bool { _, ok := err.(*AdaptorError); return ok }
 
 func (a *Adaptor) processStruct(c *gin.Context, arg argIn) (reflect.Value, error) {
@@ -1001,10 +1002,8 @@ var _ IRoutes = (*Routes)(nil)
 // T defines the tag for handler functions.
 type T interface{ t() }
 
-var (
-	// TType defines the type of T.
-	TType = reflect.TypeOf((*T)(nil)).Elem() // nolint:gochecknoglobals
-)
+// TType defines the type of T.
+var TType = reflect.TypeOf((*T)(nil)).Elem() // nolint:gochecknoglobals
 
 // InvokeArounderFactory defines the factory to create InvokeArounder
 type InvokeArounderFactory interface {

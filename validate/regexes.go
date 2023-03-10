@@ -40,7 +40,7 @@ const (
 	ethAddressUpperRegexString       = `^0x[0-9A-F]{40}$`
 	ethAddressLowerRegexString       = `^0x[0-9a-f]{40}$`
 	uRLEncodedRegexString            = `(%[A-Fa-f0-9]{2})`
-	postcodeRegexString              = `^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([A-Za-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9]?[A-Za-z])))) [0-9][A-Za-z]{2})$` //https://stackoverflow.com/questions/164979/regex-for-matching-uk-postcodes/51885364#51885364
+	postcodeRegexString              = `^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([A-Za-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9]?[A-Za-z])))) [0-9][A-Za-z]{2})$` // https://stackoverflow.com/questions/164979/regex-for-matching-uk-postcodes/51885364#51885364
 )
 
 // nolint:gochecknoglobals

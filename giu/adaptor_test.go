@@ -15,7 +15,6 @@ import (
 	"testing"
 
 	"github.com/bingoohuang/gor"
-
 	"github.com/bingoohuang/gor/giu"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -145,7 +144,7 @@ func TestUMP(t *testing.T) {
 
 	gr.HandleFn(f{})
 
-	//r.Run(":8080")
+	// r.Run(":8080")
 
 	assertResults(t, resp, c, r)
 }
@@ -186,7 +185,8 @@ func f21(id string, _ projectID) string { return "hello " + id }
 // f2 processes /Get2/:name/:age
 func f2(name string, age int, _ struct {
 	giu.T `arg:"name age,url"` // name和age都是url变量，通过gin.Context.Param(x)获取
-}) (Rsp, error) {
+},
+) (Rsp, error) {
 	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 }
 
@@ -194,21 +194,24 @@ func f2(name string, age int, _ struct {
 func f3(name string, age int, _ struct {
 	_ giu.T `arg:"name,url"`  // name是url变量，通过gin.Context.Param(x)获取
 	_ giu.T `arg:"age,query"` // age是query变量，通过gin.Context.Query(x)获取
-}) (Rsp, error) {
+},
+) (Rsp, error) {
 	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 }
 
 // f31 processes  /Get3/:name?age=100
 func f31(name string, age int, _ struct {
 	giu.T `arg:"name,url/age,query"`
-}) (Rsp, error) {
+},
+) (Rsp, error) {
 	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 }
 
 // f4 processes /Get4?name=bingoo&age=100
 func f4(name string, age int, _ struct {
 	giu.T `arg:"name age,query"` // name和age都是query变量，通过gin.Context.Query(x)获取
-}) (Rsp, error) {
+},
+) (Rsp, error) {
 	return Rsp{State: 200, Data: fmt.Sprintf("%s:%d", name, age)}, nil
 }
 
@@ -249,7 +252,7 @@ func assertResults(t *testing.T, resp *httptest.ResponseRecorder, c *gin.Context
 	checkStatusOK(t, resp, c, r, "/url", "/url")
 	checkStatusOK(t, resp, c, r, "/MyObject1", "Test")
 	checkStatusOK(t, resp, c, r, "/MyObject2", "Test")
-	//checkStatusOK(t, resp, c, r, "/Get5", "Test")
+	// checkStatusOK(t, resp, c, r, "/Get5", "Test")
 
 	c.Request, _ = http.NewRequest(http.MethodGet, "/Get51", nil)
 	r.ServeHTTP(resp, c.Request)
@@ -283,8 +286,10 @@ func checkStatusOK(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, 
 func check(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine, url string, state int, d interface{}) {
 	checkBody(t, rr, c, r, http.MethodGet, url, state, nil, d)
 }
+
 func checkBody(t *testing.T, rr *httptest.ResponseRecorder, c *gin.Context, r *gin.Engine,
-	method, url string, state int, b interface{}, d interface{}) {
+	method, url string, state int, b interface{}, d interface{},
+) {
 	if b != nil {
 		bb, _ := giu.JSONMarshal(b)
 		c.Request, _ = http.NewRequest(method, url, bytes.NewReader(bb))
@@ -407,8 +412,7 @@ func ExistsAsFile(name string) bool {
 }
 
 // InvokeArounderFactory defines the factory to create InvokeArounder
-type MyInvokeArounderFactory struct {
-}
+type MyInvokeArounderFactory struct{}
 
 // Create creates the InvokeArounder with the tag value and the handler type.
 func (MyInvokeArounderFactory) Create(handlerName, tag string, handler giu.HandlerFunc) giu.InvokeArounder {
